@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "understudy"
+version = "0.1.0"
+description = "A stand-in for the real LLM in your tests. Record LLM API calls once, replay them forever: fast, free, deterministic, offline."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "Eesh Saxena", email = "eeshsaxena@gmail.com" }]
+keywords = ["llm", "testing", "pytest", "openai", "anthropic", "vcr", "cassette", "record", "replay", "mock", "ai", "deterministic", "agents"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Framework :: Pytest",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["httpx>=0.23"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://github.com/eeshsaxena/understudy"
+Source = "https://github.com/eeshsaxena/understudy"
+Issues = "https://github.com/eeshsaxena/understudy/issues"
+
+[project.entry-points.pytest11]
+understudy = "understudy.pytest_plugin"
+
+[tool.hatch.build.targets.wheel]
+packages = ["understudy"]
