@@ -6,10 +6,14 @@ LlamaIndex all send over httpx, this single hook covers them.
 """
 from __future__ import annotations
 
+import threading
+
 import httpx
 
 from ..models import RawRequest, RawResponse
 from .base import Interceptor, get_active_engine
+
+_install_lock = threading.Lock()
 
 # Headers to drop when rebuilding a response from already-decoded bytes, or httpx
 # would try to decompress / re-length it a second time.
@@ -42,6 +46,13 @@ class HttpxInterceptor(Interceptor):
         cls = HttpxInterceptor
         if cls._installed:
             return
+        with _install_lock:  # double-checked: patch httpx exactly once, thread-safely
+            if cls._installed:
+                return
+            self._patch()
+
+    def _patch(self) -> None:
+        cls = HttpxInterceptor
         cls._orig_sync = httpx.HTTPTransport.handle_request
         cls._orig_async = httpx.AsyncHTTPTransport.handle_async_request
         orig_sync = cls._orig_sync

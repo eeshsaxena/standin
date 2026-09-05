@@ -80,6 +80,30 @@ def test_inert_passthrough_without_cassette(tmp_path, llm_server):
     assert r.status_code == 200  # normal live call, nothing recorded
 
 
+def test_unicode_body_roundtrip_and_readable(tmp_path, llm_server):
+    cass = tmp_path / "unicode.json"
+    body = {"model": "g", "messages": [{"role": "user", "content": "héllo 日本語 🎬"}]}
+    with standin.use_cassette(cass, mode="all"):
+        rec = httpx.post(f"{llm_server.url}/v1/unicode", json=body).json()["content"]
+    llm_server.stop()
+    with standin.use_cassette(cass, mode="none"):
+        rep = httpx.post(f"{llm_server.url}/v1/unicode", json=body).json()["content"]
+    assert rep == rec == "café 日本語 🎬 mañana"
+    text = cass.read_text(encoding="utf-8")
+    assert "日本語" in text  # stored human-readable, not \uXXXX-escaped
+
+
+def test_large_body_roundtrip(tmp_path, llm_server):
+    cass = tmp_path / "big.json"
+    with standin.use_cassette(cass, mode="all"):
+        rec = httpx.post(f"{llm_server.url}/v1/big", json={"x": 1}).json()["content"]
+    assert len(rec) == 200_000
+    llm_server.stop()
+    with standin.use_cassette(cass, mode="none"):
+        rep = httpx.post(f"{llm_server.url}/v1/big", json={"x": 1}).json()["content"]
+    assert rep == rec
+
+
 def test_redact_false_keeps_raw(tmp_path, llm_server):
     cass = tmp_path / "raw.json"
     with standin.use_cassette(cass, mode="all", redact=False):

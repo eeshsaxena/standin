@@ -44,7 +44,7 @@ def decode_body(body: dict[str, Any]) -> bytes:
     if not body or body.get("empty"):
         return b""
     if "json" in body:
-        return json.dumps(body["json"]).encode("utf-8")
+        return json.dumps(body["json"], ensure_ascii=False).encode("utf-8")
     if "text" in body:
         return body["text"].encode("utf-8")
     if "b64" in body:

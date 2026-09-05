@@ -30,3 +30,12 @@ class Config:
                 ) from exc
         if self.redactor is None:
             self.redactor = DefaultRedactor() if self.redact else NullRedactor()
+        # Validate match_on only for the built-in matcher; a custom matcher may
+        # define its own vocabulary.
+        if self.matcher is None:
+            valid = {"method", "url", "body"}
+            unknown = set(self.match_on) - valid
+            if unknown:
+                raise ConfigError(
+                    f"unknown match_on {sorted(unknown)}; valid options are {sorted(valid)}"
+                )

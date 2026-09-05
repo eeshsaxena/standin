@@ -78,6 +78,12 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._send(429, "application/json", json.dumps({"error": {"message": "rate limited", "n": n}}).encode())
         elif path == "/v1/text":
             self._send(200, "text/plain", f"plain reply #{n}".encode())
+        elif path == "/v1/unicode":
+            payload = json.dumps({"id": f"u{n}", "content": "café 日本語 🎬 mañana"}, ensure_ascii=False)
+            self._send(200, "application/json", payload.encode("utf-8"))
+        elif path == "/v1/big":
+            payload = json.dumps({"id": f"big{n}", "content": "x" * 200_000})
+            self._send(200, "application/json", payload.encode())
         else:
             self._send(200, "application/json", json.dumps({
                 "id": f"chatcmpl-{n}",
