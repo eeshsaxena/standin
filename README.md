@@ -2,6 +2,8 @@
 
 **A stand-in for the real LLM in your tests.** Record your LLM API calls once, then replay them forever: fast, free, deterministic, and fully offline. One line, any provider.
 
+<p align="center"><img src="demo/standin.gif" alt="standin: record LLM calls once, replay them instantly and offline" width="820"></p>
+
 ```python
 import standin
 
