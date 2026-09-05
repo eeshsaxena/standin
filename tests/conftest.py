@@ -1,4 +1,7 @@
-"""Shared test fixtures: a tiny local 'LLM' HTTP server (JSON + SSE)."""
+"""Shared fixtures: a local server that speaks OpenAI, Anthropic, and raw shapes.
+
+No real API keys or network are ever used; the SDKs are pointed at this server.
+"""
 from __future__ import annotations
 
 import http.server
@@ -8,39 +11,78 @@ import threading
 
 import pytest
 
+pytest_plugins = ["pytester"]
+
 _counter = {"n": 0}
 
 
+def _openai_json(n):
+    return {
+        "id": f"chatcmpl-{n}", "object": "chat.completion", "created": 0, "model": "gpt-4o-mini",
+        "choices": [{"index": 0, "message": {"role": "assistant", "content": f"reply #{n}"}, "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+    }
+
+
+def _anthropic_json(n):
+    return {
+        "id": f"msg_{n}", "type": "message", "role": "assistant", "model": "claude-3-haiku-20240307",
+        "content": [{"type": "text", "text": f"reply #{n}"}], "stop_reason": "end_turn", "stop_sequence": None,
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+
+
+def _openai_sse(n):
+    base = {"id": f"chatcmpl-{n}", "object": "chat.completion.chunk", "created": 0, "model": "gpt-4o-mini"}
+    chunks = [
+        {**base, "choices": [{"index": 0, "delta": {"role": "assistant", "content": "Hello"}, "finish_reason": None}]},
+        {**base, "choices": [{"index": 0, "delta": {"content": " world"}, "finish_reason": None}]},
+        {**base, "choices": [{"index": 0, "delta": {}, "finish_reason": "stop"}]},
+    ]
+    lines = [f"data: {json.dumps(c)}" for c in chunks] + ["data: [DONE]"]
+    return ("\n\n".join(lines) + "\n\n").encode()
+
+
 class _Handler(http.server.BaseHTTPRequestHandler):
-    def log_message(self, *a):  # quiet
+    def log_message(self, *a):
         pass
 
     def _read(self):
         n = int(self.headers.get("Content-Length", 0))
         return self.rfile.read(n) if n else b""
 
-    def do_POST(self):
-        self._read()
-        _counter["n"] += 1
-        if self.path == "/v1/stream":
-            chunks = [
-                'data: {"choices":[{"delta":{"content":"Hello"}}]}',
-                'data: {"choices":[{"delta":{"content":" world"}}]}',
-                "data: [DONE]",
-            ]
-            body = ("\n\n".join(chunks) + "\n\n").encode()
-            ctype = "text/event-stream"
-        else:
-            body = json.dumps({
-                "id": f"chatcmpl-{_counter['n']}",
-                "choices": [{"message": {"role": "assistant", "content": f"reply #{_counter['n']}"}}],
-            }).encode()
-            ctype = "application/json"
-        self.send_response(200)
+    def _send(self, status, ctype, body):
+        self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def do_POST(self):
+        body = self._read()
+        _counter["n"] += 1
+        n = _counter["n"]
+        path = self.path
+
+        if path.endswith("/chat/completions"):
+            if b'"stream": true' in body or b'"stream":true' in body:
+                self._send(200, "text/event-stream", _openai_sse(n))
+            else:
+                self._send(200, "application/json", json.dumps(_openai_json(n)).encode())
+        elif path.endswith("/messages"):
+            self._send(200, "application/json", json.dumps(_anthropic_json(n)).encode())
+        elif path == "/v1/stream":
+            chunks = ['data: {"delta":"Hello"}', 'data: {"delta":" world"}', "data: [DONE]"]
+            self._send(200, "text/event-stream", ("\n\n".join(chunks) + "\n\n").encode())
+        elif path == "/v1/error":
+            self._send(429, "application/json", json.dumps({"error": {"message": "rate limited", "n": n}}).encode())
+        elif path == "/v1/text":
+            self._send(200, "text/plain", f"plain reply #{n}".encode())
+        else:
+            self._send(200, "application/json", json.dumps({
+                "id": f"chatcmpl-{n}",
+                "choices": [{"message": {"role": "assistant", "content": f"reply #{n}"}}],
+            }).encode())
 
 
 def _free_port() -> int:
