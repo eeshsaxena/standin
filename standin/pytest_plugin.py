@@ -1,7 +1,7 @@
-"""pytest integration: an `understudy` fixture and an `@pytest.mark.understudy` marker.
+"""pytest integration: a ``standin`` fixture and a ``@pytest.mark.standin`` marker.
 
-Cassettes default to `<test-dir>/cassettes/<test-name>.json`. First run records,
-later runs replay. In CI, set UNDERSTUDY_MODE=none to fail on any un-recorded call.
+Cassettes default to ``<test-dir>/cassettes/<test-name>.json``. First run records;
+later runs replay. In CI, set ``STANDIN_MODE=none`` to fail on any un-recorded call.
 """
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ from .core import use_cassette
 def pytest_configure(config):
     config.addinivalue_line(
         "markers",
-        "understudy(path=None, mode='once', match_on=None): record/replay LLM HTTP calls for this test",
+        "standin(path=None, mode='once', match_on=None): record/replay LLM HTTP calls for this test",
     )
 
 
 @pytest.fixture
-def understudy(request):
-    marker = request.node.get_closest_marker("understudy")
+def standin(request):
+    marker = request.node.get_closest_marker("standin")
     opts = dict(marker.kwargs) if marker else {}
 
     name = opts.get("path") or f"{request.node.name}.json"
