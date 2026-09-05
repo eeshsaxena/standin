@@ -24,16 +24,17 @@ class Cassette:
             self.interactions.append(interaction)
             self.dirty = True
 
-    def find_unplayed(self, stored_key_fn, live_key: str) -> Interaction | None:
-        """Return the first not-yet-played interaction whose key matches.
+    def find_unplayed(self, matches, live_request) -> Interaction | None:
+        """Return the first not-yet-played interaction that matches the request.
 
-        Playing in order lets repeated identical calls (e.g. an agent loop)
-        replay their distinct recorded responses sequentially. Guarded by a lock
-        so a cassette shared across threads never double-plays one interaction.
+        `matches(live_request, stored_request) -> bool` is supplied by the
+        matcher, so exact and fuzzy strategies share this loop. Playing in order
+        lets repeated calls (e.g. an agent loop) replay their distinct recorded
+        responses sequentially. Locked so a shared cassette never double-plays.
         """
         with self._lock:
             for interaction in self.interactions:
-                if not interaction.played and stored_key_fn(interaction.request) == live_key:
+                if not interaction.played and matches(live_request, interaction.request):
                     interaction.played = True
                     return interaction
         return None

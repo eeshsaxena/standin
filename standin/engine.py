@@ -48,7 +48,7 @@ class Engine:
         return try_replay, record_on_miss
 
     def _find(self, request: RawRequest):
-        return self.cassette.find_unplayed(self.matcher.stored_key, self.matcher.live_key(request))
+        return self.cassette.find_unplayed(self.matcher.matches, request)
 
     def _replay(self, interaction: Interaction) -> RawResponse:
         r = interaction.response

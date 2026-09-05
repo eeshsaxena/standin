@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-05
+
+### Added
+- `standin` command-line tool: `list`, `show`, `stats`, and `scrub` (re-run
+  secret redaction over an existing cassette).
+- `FuzzyMatcher`: match method/url exactly but allow the request body to differ
+  up to a similarity threshold, so a reworded/reformatted prompt still replays.
+  A semantic/embedding matcher plugs in the same way (implement `matches`).
+- Runnable examples for OpenAI and LangChain under `examples/`.
+
+### Changed
+- The `Matcher` protocol is now a single `matches(live, stored)` predicate
+  (exact and fuzzy strategies share the cassette lookup). `DefaultMatcher` keeps
+  its `live_key`/`stored_key` helpers.
+
 ## [0.1.0] - 2026-09-05
 
 ### Added

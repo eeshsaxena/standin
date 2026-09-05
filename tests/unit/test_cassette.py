@@ -1,5 +1,5 @@
 from standin.cassette import Cassette
-from standin.models import Interaction, RecordedRequest, RecordedResponse
+from standin.models import Interaction, RawRequest, RecordedRequest, RecordedResponse
 
 
 def _make(content_id):
@@ -9,8 +9,13 @@ def _make(content_id):
     )
 
 
-def _key(req):
-    return req.body["json"]["q"]
+def _matches_q(qval):
+    def m(live, stored):
+        return stored.body["json"]["q"] == qval
+    return m
+
+
+LIVE = RawRequest("POST", "http://x", {}, b"")
 
 
 def test_append_marks_dirty_and_counts_preexisting():
@@ -23,13 +28,11 @@ def test_append_marks_dirty_and_counts_preexisting():
 
 
 def test_find_unplayed_consumes_in_order():
-    # two interactions with the SAME key must replay in recorded order
     c = Cassette(path="x", interactions=[_make("same"), _make("same")])
-    for interaction in c.interactions:
-        interaction.response.body["json"]["seq"] = id(interaction)
-    first = c.find_unplayed(_key, "same")
-    second = c.find_unplayed(_key, "same")
-    third = c.find_unplayed(_key, "same")
+    m = _matches_q("same")
+    first = c.find_unplayed(m, LIVE)
+    second = c.find_unplayed(m, LIVE)
+    third = c.find_unplayed(m, LIVE)
     assert first is not None and second is not None
     assert first is not second
     assert third is None  # exhausted
@@ -37,4 +40,4 @@ def test_find_unplayed_consumes_in_order():
 
 def test_find_unplayed_no_match():
     c = Cassette(path="x", interactions=[_make("a")])
-    assert c.find_unplayed(_key, "missing") is None
+    assert c.find_unplayed(_matches_q("missing"), LIVE) is None

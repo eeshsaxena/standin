@@ -110,14 +110,31 @@ Everything is a small protocol you can replace (see [ARCHITECTURE.md](ARCHITECTU
 standin.use_cassette(path, matcher=MyMatcher(), redactor=MyRedactor(), store=MyStore())
 ```
 
-- **Matcher** — decide when a live request equals a recorded one.
+- **Matcher** — decide when a live request equals a recorded one. Ships with
+  `DefaultMatcher` (exact) and `FuzzyMatcher` (body may drift up to a similarity
+  threshold, so a reworded prompt still replays):
+
+  ```python
+  from standin import use_cassette, FuzzyMatcher, DefaultRedactor
+  with use_cassette(path, matcher=FuzzyMatcher(DefaultRedactor(), threshold=0.9)):
+      ...
+  ```
 - **Redactor** — control what gets scrubbed before writing.
 - **CassetteStore** — change the on-disk format.
 
+## Command line
+
+```bash
+standin list  tests/cassettes/summary.json     # one line per interaction
+standin show  tests/cassettes/summary.json 0   # full request/response
+standin stats tests/cassettes/summary.json     # counts by method/status
+standin scrub tests/cassettes/summary.json     # re-run secret redaction in place
+```
+
 ## Roadmap
 
-- Semantic request matching (embed + threshold) so paraphrased prompts still hit.
-- A `standin` CLI to inspect, diff, and re-scrub cassettes.
+- Embedding-based semantic matching (a `Matcher` you drop in; `FuzzyMatcher`
+  already covers string-similarity drift today).
 - `requests` / `aiohttp` interceptors (the engine is already transport-neutral).
 
 ## Contributing
