@@ -1,23 +1,18 @@
 name: Release
 
-# Publishes to PyPI when a v* tag is pushed. Uses PyPI Trusted Publishing (OIDC),
-# so no API token secret is needed once you register this repo + the "pypi"
-# environment as a trusted publisher at https://pypi.org/manage/account/publishing/.
-# (Prefer a token instead? Swap the last step for pypa/gh-action-pypi-publish with
-#  `password: ${{ secrets.PYPI_API_TOKEN }}`.)
+# Publishes to PyPI when a v* tag is pushed, using a PyPI API token stored as the
+# repository secret PYPI_API_TOKEN (Settings -> Secrets and variables -> Actions).
+# The token never leaves GitHub's secret store.
+# (Prefer tokenless Trusted Publishing? Drop the `with: password` below, add
+#  `permissions: id-token: write`, and register a trusted publisher on PyPI.)
 
 on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: read
-  id-token: write
-
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
-    environment: pypi
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -27,3 +22,5 @@ jobs:
       - run: python -m build
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
