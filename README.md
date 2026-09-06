@@ -93,6 +93,14 @@ An explicit `--standin-mode`/`--standin-record` wins over both the `@pytest.mark
 mode and `STANDIN_MODE`; with neither flag, the existing marker and `STANDIN_MODE`
 behavior is unchanged.
 
+## Performance
+
+With the default matcher, replay is **O(1) per request**: the cassette indexes
+recorded interactions by request key and pops the next match, instead of scanning
+the whole cassette. Replaying a 5,000-interaction cassette runs about **5.5x** faster
+than the linear scan (`benchmarks/bench_matching.py`), and the per-request cost stays
+flat as the cassette grows. Fuzzy and semantic matchers keep the linear scan.
+
 ## What a cassette looks like
 
 Plain, reviewable JSON, secrets already stripped:

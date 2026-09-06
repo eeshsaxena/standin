@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-06
+
+### Changed
+- Replay lookup is now O(1) per request with the default matcher. When the
+  active matcher exposes `live_key`/`stored_key` (`DefaultMatcher`), the cassette
+  builds a key -> queue index and pops the next unplayed recording for a request
+  instead of scanning every interaction. Semantics are unchanged: repeated calls
+  replay in recorded order, each recording plays once, misses still return the
+  same replay-miss diagnostics, and the lookup stays thread-safe. `FuzzyMatcher`,
+  `SemanticMatcher`, and any custom matcher without those key functions keep the
+  linear scan. On-disk format and public API are unchanged. `benchmarks/bench_matching.py`
+  replays a 5,000-interaction cassette about 5.5x faster than the scan, and the
+  per-request cost stays flat (~6 us) as the cassette grows.
+
 ## [0.6.0] - 2026-09-06
 
 ### Added
