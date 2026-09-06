@@ -10,14 +10,18 @@ from .cassette import Cassette
 from .config import Config
 from .engine import Engine
 from .exceptions import ConfigError
+from .interceptors.aiohttp_interceptor import AiohttpInterceptor
 from .interceptors.base import reset_active_engine, set_active_engine
 from .interceptors.httpx_interceptor import HttpxInterceptor
+from .interceptors.requests_interceptor import RequestsInterceptor
 from .matching import DEFAULT_MATCH_ON, Matcher
 from .models import Mode
 from .redaction import Redactor
 from .storage import CassetteStore
 
-_httpx_interceptor = HttpxInterceptor()
+# One instance per transport. Each install() is idempotent and a no-op if that
+# library is not installed, so activating all three is always safe.
+_interceptors = (HttpxInterceptor(), RequestsInterceptor(), AiohttpInterceptor())
 
 
 @contextmanager
@@ -58,7 +62,8 @@ def use_cassette(
     cassette = Cassette(path=path, interactions=config.store.load(path))
     engine = Engine(cassette, config)
 
-    _httpx_interceptor.install()
+    for interceptor in _interceptors:
+        interceptor.install()
     token = set_active_engine(engine)
     try:
         yield cassette
