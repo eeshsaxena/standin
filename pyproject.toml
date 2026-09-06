@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "standin"
-version = "0.2.0"
+version = "0.3.0"
 description = "A stand-in for the real LLM in your tests. Record LLM API calls once, replay them forever: fast, free, deterministic, offline."
 readme = "README.md"
 requires-python = ">=3.9"

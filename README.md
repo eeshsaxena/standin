@@ -21,10 +21,11 @@ Your LLM tests are slow, flaky, and cost money because they hit real APIs. `stan
 
 VCR.py is great, but it's a general HTTP tool. `standin` is built for LLMs:
 
-- **Provider-agnostic, zero wiring.** It hooks `httpx` under the hood, so it works with **OpenAI, Anthropic, Gemini, Mistral, Cohere, litellm, LangChain, LlamaIndex** — anything that sends over httpx. No per-SDK adapters.
+- **Provider-agnostic, zero wiring.** It hooks `httpx`, `requests`, and `aiohttp`, so it works with **OpenAI, Anthropic, Gemini, Mistral, Cohere, litellm, LangChain, LlamaIndex** and anything else built on those three clients. No per-SDK adapters.
 - **Streaming just works.** Server-sent event (SSE) responses are recorded and replayed intact.
 - **Safe to commit.** API keys in headers and secret-looking tokens in bodies are **redacted automatically**, so cassettes can live in a public repo.
 - **Body-aware matching.** Requests match on normalized JSON, so key ordering and formatting noise don't break replays. Repeated identical calls (agent loops) replay in order.
+- **Replay misses explain themselves.** When no recording matches in replay-only mode, the error names the closest recording and shows a field-level diff (or tells you the recording was already replayed), instead of a bare "not found".
 - **One-line pytest fixture**, with sane auto-named cassettes.
 - **Clean, typed, extensible core** (see [ARCHITECTURE.md](ARCHITECTURE.md)) — swap the matcher, redactor, or storage backend.
 
@@ -135,7 +136,6 @@ standin scrub tests/cassettes/summary.json     # re-run secret redaction in plac
 
 - Embedding-based semantic matching (a `Matcher` you drop in; `FuzzyMatcher`
   already covers string-similarity drift today).
-- `requests` / `aiohttp` interceptors (the engine is already transport-neutral).
 
 ## Contributing
 

@@ -7,6 +7,8 @@ here in one testable place.
 """
 from __future__ import annotations
 
+import difflib
+import json
 from collections.abc import Awaitable
 from typing import Callable
 
@@ -70,7 +72,47 @@ class Engine:
         ))
 
     def _miss(self, request: RawRequest) -> CannotReplay:
-        return CannotReplay(f"standin: no recorded interaction for {request.method} {request.url}")
+        """Build a replay-miss error that says *why* nothing matched.
+
+        Three cases, most to least specific: an empty cassette; a request that does
+        match a recording but whose recording was already replayed (the classic
+        agent-loop / call-count mistake); or a genuine mismatch, in which case we
+        show the closest recording and a field-level diff.
+        """
+        interactions = self.cassette.interactions
+        head = f"standin: no recorded interaction matches {request.method} {request.url}"
+
+        if not interactions:
+            return CannotReplay(f"{head} (the cassette is empty). Record it first with mode 'once' or 'all'.")
+
+        consumed = [i for i in interactions if self.matcher.matches(request, i.request)]
+        if consumed:
+            return CannotReplay(
+                f"{head}: it matched {len(consumed)} recording(s), but they were all already replayed. "
+                f"The code made more calls than were recorded, or in a different order. "
+                f"Re-record with mode='all', or record the extra call with mode='new_episodes'."
+            )
+
+        live_body = _codec.canonical_live(request.body, _ct(request.headers), self.redactor)
+        best = max(
+            interactions,
+            key=lambda i: difflib.SequenceMatcher(None, live_body, _codec.canonical_stored(i.request.body)).ratio(),
+        )
+        diffs = []
+        if request.method.upper() != best.request.method.upper():
+            diffs.append(f"  method: live={request.method.upper()!r} recorded={best.request.method.upper()!r}")
+        if request.url != best.request.url:
+            diffs.append(f"  url:\n    live:     {request.url}\n    recorded: {best.request.url}")
+        stored_body = _codec.canonical_stored(best.request.body)
+        if live_body != stored_body:
+            ratio = difflib.SequenceMatcher(None, live_body, stored_body).ratio()
+            diffs.append(f"  body ({ratio:.0%} similar):\n{_body_diff(stored_body, live_body)}")
+
+        detail = "\n".join(diffs) or "  (closest recording differs only in a field you are not matching on)"
+        return CannotReplay(
+            f"{head}.\nClosest of {len(interactions)} recording(s) differs by:\n{detail}\n"
+            f"Adjust the request to match, or re-record with mode='all'."
+        )
 
     # -- entry points -------------------------------------------------------
     def handle(self, request: RawRequest, do_real: SyncReal) -> RawResponse:
@@ -103,3 +145,20 @@ def _ct(headers) -> str:
         if k.lower() == "content-type":
             return v
     return ""
+
+
+def _pretty(canonical: str) -> list[str]:
+    """Pretty-print a canonical body so a diff reads line by line (JSON if it is JSON)."""
+    try:
+        return json.dumps(json.loads(canonical), indent=2, sort_keys=True, ensure_ascii=False).splitlines()
+    except (ValueError, TypeError):
+        return canonical.splitlines() or [canonical]
+
+
+def _body_diff(recorded: str, live: str, max_lines: int = 40) -> str:
+    diff = list(
+        difflib.unified_diff(_pretty(recorded), _pretty(live), fromfile="recorded", tofile="live", lineterm="")
+    )
+    if len(diff) > max_lines:
+        diff = diff[:max_lines] + ["... (diff truncated)"]
+    return "\n".join("    " + line for line in diff)

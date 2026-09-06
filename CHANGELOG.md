@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-06
+
+### Added
+- `requests` and `aiohttp` interceptors, so standin now covers SDKs and tools
+  built on those clients, not only `httpx`. On record, the real response is
+  returned; on replay it is served offline.
+- Replay-miss diagnostics: in replay-only mode, an unmatched request now reports
+  the closest recording with a field-level diff, or says the matching recording
+  was already replayed (the usual agent-loop / call-count mistake), instead of a
+  bare "no recorded interaction".
+
 ## [0.2.0] - 2026-09-05
 
 ### Added
