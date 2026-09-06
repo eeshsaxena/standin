@@ -32,6 +32,24 @@ def _anthropic_json(n):
     }
 
 
+def _openai_tool_json(n):
+    return {
+        "id": f"chatcmpl-{n}", "object": "chat.completion", "created": 0, "model": "gpt-4o-mini",
+        "choices": [{
+            "index": 0,
+            "message": {
+                "role": "assistant", "content": None,
+                "tool_calls": [{
+                    "id": f"call_{n}", "type": "function",
+                    "function": {"name": "get_weather", "arguments": '{"city": "Paris"}'},
+                }],
+            },
+            "finish_reason": "tool_calls",
+        }],
+        "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+    }
+
+
 def _openai_sse(n):
     base = {"id": f"chatcmpl-{n}", "object": "chat.completion.chunk", "created": 0, "model": "gpt-4o-mini"}
     chunks = [
@@ -65,7 +83,9 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         path = self.path
 
         if path.endswith("/chat/completions"):
-            if b'"stream": true' in body or b'"stream":true' in body:
+            if b'"tools"' in body:
+                self._send(200, "application/json", json.dumps(_openai_tool_json(n)).encode())
+            elif b'"stream": true' in body or b'"stream":true' in body:
                 self._send(200, "text/event-stream", _openai_sse(n))
             else:
                 self._send(200, "application/json", json.dumps(_openai_json(n)).encode())

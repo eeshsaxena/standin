@@ -46,3 +46,30 @@ def test_openai_streaming(tmp_path, llm_server):
     with standin.use_cassette(cass, mode="none"):
         replayed = run(llm_server.url)
     assert replayed == live == "Hello world"
+
+
+def test_openai_tool_call_round_trips(tmp_path, llm_server):
+    cass = tmp_path / "openai_tools.json"
+    tools = [{
+        "type": "function",
+        "function": {
+            "name": "get_weather",
+            "parameters": {"type": "object", "properties": {"city": {"type": "string"}}},
+        },
+    }]
+
+    def run(url):
+        r = _client(url).chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": "weather in Paris?"}],
+            tools=tools,
+        )
+        call = r.choices[0].message.tool_calls[0]
+        return call.function.name, call.function.arguments
+
+    with standin.use_cassette(cass, mode="all"):
+        live = run(llm_server.url)
+    llm_server.stop()
+    with standin.use_cassette(cass, mode="none"):
+        replayed = run(llm_server.url)
+    assert replayed == live == ("get_weather", '{"city": "Paris"}')
