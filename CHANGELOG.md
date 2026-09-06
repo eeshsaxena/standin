@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-06
+
+### Added
+- `SemanticMatcher`: match method/url exactly but compare request bodies by
+  embedding cosine similarity, so a paraphrased prompt still replays. It stays
+  dependency-free — you pass an `embed` callable (`str -> Sequence[float]`), so it
+  works with sentence-transformers, an embeddings API, or anything else. Cosine is
+  computed in pure Python.
+- Runnable examples for the Anthropic SDK and litellm under `examples/`, and an
+  integration test proving an OpenAI-style tool-call response round-trips through
+  a cassette.
+
 ## [0.3.0] - 2026-09-06
 
 ### Added

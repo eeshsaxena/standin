@@ -111,13 +111,20 @@ Everything is a small protocol you can replace (see [ARCHITECTURE.md](ARCHITECTU
 standin.use_cassette(path, matcher=MyMatcher(), redactor=MyRedactor(), store=MyStore())
 ```
 
-- **Matcher** — decide when a live request equals a recorded one. Ships with
-  `DefaultMatcher` (exact) and `FuzzyMatcher` (body may drift up to a similarity
-  threshold, so a reworded prompt still replays):
+- **Matcher** — decide when a live request equals a recorded one. Three ship:
+  `DefaultMatcher` (exact, JSON key-order-insensitive), `FuzzyMatcher` (body may
+  drift up to a string-similarity threshold, so a reworded prompt still replays),
+  and `SemanticMatcher` (body matches on embedding cosine similarity, so a
+  paraphrase still replays). `SemanticMatcher` stays dependency-free: you pass an
+  `embed` callable, so it works with sentence-transformers, an embeddings API, or
+  anything else.
 
   ```python
-  from standin import use_cassette, FuzzyMatcher, DefaultRedactor
+  from standin import use_cassette, FuzzyMatcher, SemanticMatcher, DefaultRedactor
   with use_cassette(path, matcher=FuzzyMatcher(DefaultRedactor(), threshold=0.9)):
+      ...
+  # embed: Callable[[str], Sequence[float]] — wire your own model or service.
+  with use_cassette(path, matcher=SemanticMatcher(embed, DefaultRedactor(), threshold=0.95)):
       ...
   ```
 - **Redactor** — control what gets scrubbed before writing.
@@ -134,8 +141,9 @@ standin scrub tests/cassettes/summary.json     # re-run secret redaction in plac
 
 ## Roadmap
 
-- Embedding-based semantic matching (a `Matcher` you drop in; `FuzzyMatcher`
-  already covers string-similarity drift today).
+Embedding-based semantic matching shipped in 0.4 as `SemanticMatcher`, a
+dependency-free drop-in (`FuzzyMatcher` still covers string-similarity drift, and
+`DefaultMatcher` stays the exact default).
 
 ## Contributing
 
