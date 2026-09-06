@@ -16,7 +16,7 @@ and **stores**, so behavior is easy to reason about and extend.
 from .config import Config
 from .core import use_cassette
 from .exceptions import CannotReplay, CassetteError, ConfigError, StandinError
-from .matching import DefaultMatcher, FuzzyMatcher, Matcher
+from .matching import DefaultMatcher, FuzzyMatcher, Matcher, SemanticMatcher
 from .models import Mode
 from .redaction import DefaultRedactor, NullRedactor, Redactor
 from .storage import CassetteStore, JSONCassetteStore
@@ -36,6 +36,7 @@ __all__ = [
     "Matcher",
     "DefaultMatcher",
     "FuzzyMatcher",
+    "SemanticMatcher",
     "CassetteStore",
     "JSONCassetteStore",
     "__version__",

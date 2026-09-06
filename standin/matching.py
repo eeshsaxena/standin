@@ -1,19 +1,23 @@
 """Request matching.
 
-The `Matcher` protocol is a single predicate, `matches(live, stored)`. Two
+The `Matcher` protocol is a single predicate, `matches(live, stored)`. Three
 implementations ship:
 
 * ``DefaultMatcher`` — exact match on any subset of method/url/body, and
   JSON-body matching is key-order-insensitive.
 * ``FuzzyMatcher`` — method/url exact, but the body may differ up to a string
   similarity threshold, so a reworded or reformatted prompt still replays.
+* ``SemanticMatcher`` — method/url exact, but bodies match on embedding cosine
+  similarity, so a paraphrase still replays. Dependency-free: you supply the
+  ``embed`` callable (sentence-transformers, an API, whatever you like).
 
-A true embedding/semantic matcher plugs in the same way: implement ``matches``.
+Any other strategy plugs in the same way: implement ``matches``.
 """
 from __future__ import annotations
 
 import difflib
-from collections.abc import Sequence
+import math
+from collections.abc import Callable, Sequence
 from typing import Protocol, runtime_checkable
 
 from . import _codec
@@ -80,6 +84,46 @@ class FuzzyMatcher:
             if lb != sb and difflib.SequenceMatcher(None, lb, sb).ratio() < self.threshold:
                 return False
         return True
+
+
+class SemanticMatcher:
+    """Match on meaning, not characters. method/url must match (per match_on); the
+    body is embedded with the caller-supplied ``embed`` and accepted when the two
+    vectors' cosine similarity is at least ``threshold``. Zero deps: wire ``embed``
+    to sentence-transformers, an embeddings API, or any ``str -> Sequence[float]``."""
+
+    def __init__(
+        self,
+        embed: Callable[[str], Sequence[float]],
+        redactor: Redactor,
+        match_on: Sequence[str] = DEFAULT_MATCH_ON,
+        threshold: float = 0.95,
+    ):
+        self._embed = embed
+        self._redactor = redactor
+        self._match_on = tuple(match_on)
+        self.threshold = threshold
+
+    def matches(self, live: RawRequest, stored: RecordedRequest) -> bool:
+        if "method" in self._match_on and live.method.upper() != stored.method.upper():
+            return False
+        if "url" in self._match_on and live.url != stored.url:
+            return False
+        if "body" in self._match_on:
+            lb = _codec.canonical_live(live.body, _content_type(live.headers), self._redactor)
+            sb = _codec.canonical_stored(stored.body)
+            if lb != sb and _cosine(self._embed(lb), self._embed(sb)) < self.threshold:
+                return False
+        return True
+
+
+def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
+    dot = sum(x * y for x, y in zip(a, b))
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    if na == 0.0 or nb == 0.0:
+        return 0.0
+    return dot / (na * nb)
 
 
 def _content_type(headers) -> str:
