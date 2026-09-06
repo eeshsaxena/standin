@@ -3,11 +3,11 @@
 The `Matcher` protocol is a single predicate, `matches(live, stored)`. Three
 implementations ship:
 
-* ``DefaultMatcher`` — exact match on any subset of method/url/body, and
+* ``DefaultMatcher``: exact match on any subset of method/url/body, and
   JSON-body matching is key-order-insensitive.
-* ``FuzzyMatcher`` — method/url exact, but the body may differ up to a string
+* ``FuzzyMatcher``: method/url exact, but the body may differ up to a string
   similarity threshold, so a reworded or reformatted prompt still replays.
-* ``SemanticMatcher`` — method/url exact, but bodies match on embedding cosine
+* ``SemanticMatcher``: method/url exact, but bodies match on embedding cosine
   similarity, so a paraphrase still replays. Dependency-free: you supply the
   ``embed`` callable (sentence-transformers, an API, whatever you like).
 

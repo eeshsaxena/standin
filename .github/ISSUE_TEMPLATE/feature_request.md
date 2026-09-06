@@ -8,6 +8,6 @@ labels: enhancement
 
 **The idea**
 
-**Which layer** (interceptor / matcher / redactor / store / engine — see ARCHITECTURE.md)
+**Which layer** (interceptor / matcher / redactor / store / engine; see ARCHITECTURE.md)
 
 **Alternatives considered**

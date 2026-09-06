@@ -59,8 +59,8 @@ class Cassette:
         The matcher's match is exactly `live_key(live) == stored_key(stored)`, so
         instead of scanning we keep a per-key queue of not-yet-played interactions
         in recorded order and pop the next one for the live request's key. Same
-        result as the linear scan — repeats replay in recorded order, each once,
-        misses return None — but without walking every interaction. Locked the same
+        result as the linear scan (repeats replay in recorded order, each once,
+        misses return None), but without walking every interaction. Locked the same
         way, so a shared cassette never double-plays.
         """
         key = live_key(live_request)

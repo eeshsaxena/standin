@@ -7,8 +7,8 @@ request and O(n^2) to replay a whole cassette.
 
 This times a full in-order replay of a large cassette both ways and prints the
 speedup. In-order replay is the realistic case (a test or agent loop replays the
-calls it recorded, in order) and it is the *kindest* case for the linear scan —
-the already-played prefix is skipped cheaply — so the number here is honest, not
+calls it recorded, in order) and it is the *kindest* case for the linear scan (the
+already-played prefix is skipped cheaply), so the number here is honest, not
 cherry-picked. Only the cassette lookup is measured; there is no network or
 decoding in replay. Run: `python benchmarks/bench_matching.py [n]`.
 """

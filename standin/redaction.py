@@ -6,7 +6,7 @@ covers auth headers, secret field names, and common secret token formats, and
 
 The header set, field-name set, and token patterns are module-level so the same
 rules drive both scrubbing (``redact_*``) and the ``standin verify`` gate
-(``scan_*``) — one source of truth for what counts as a secret.
+(``scan_*``): one source of truth for what counts as a secret.
 """
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ SECRET_PATTERNS: list[Pattern[str]] = [
 
 
 def _snippet(value: Any, keep: int = 8) -> str:
-    """A short, masked view of a secret — enough to locate, not to leak in CI logs."""
+    """A short, masked view of a secret: enough to locate, not to leak in CI logs."""
     text = str(value)
     return text if len(text) <= keep else text[:keep] + "..."
 

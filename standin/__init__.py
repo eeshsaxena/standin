@@ -1,8 +1,9 @@
-"""standin — a stand-in for the real LLM in your tests.
+"""standin: a stand-in for the real LLM in your tests.
 
 Record real LLM API calls once, then replay them forever: fast, free, offline,
-and deterministic. Provider-agnostic (hooks httpx), streaming and tool-calls
-supported, secrets redacted so cassettes are safe to commit.
+and deterministic. Provider-agnostic (hooks httpx, requests, and aiohttp),
+streaming and tool-calls supported, secrets redacted so cassettes are safe to
+commit.
 
     import standin
 
@@ -10,8 +11,8 @@ supported, secrets redacted so cassettes are safe to commit.
         resp = openai_client.chat.completions.create(...)   # recorded once, replayed after
 
 Architecture (see ARCHITECTURE.md): a transport-neutral policy **engine** sits
-behind pluggable **interceptors** (httpx today), **matchers**, **redactors**,
-and **stores**, so behavior is easy to reason about and extend.
+behind pluggable **interceptors** (httpx, requests, aiohttp), **matchers**,
+**redactors**, and **stores**, so behavior is easy to reason about and extend.
 """
 from .config import Config
 from .core import use_cassette

@@ -3,7 +3,7 @@
     pytest examples/litellm_example.py -p standin.pytest_plugin
 
 litellm calls providers over httpx, which standin hooks, so wrapping the call in
-a cassette records it once and replays it offline — no per-provider wiring. First
+a cassette records it once and replays it offline, no per-provider wiring. First
 run needs the provider key (e.g. OPENAI_API_KEY); every run after is free.
 """
 import pytest

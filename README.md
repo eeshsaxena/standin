@@ -27,7 +27,7 @@ VCR.py is great, but it's a general HTTP tool. `standin` is built for LLMs:
 - **Body-aware matching.** Requests match on normalized JSON, so key ordering and formatting noise don't break replays. Repeated identical calls (agent loops) replay in order.
 - **Replay misses explain themselves.** When no recording matches in replay-only mode, the error names the closest recording and shows a field-level diff (or tells you the recording was already replayed), instead of a bare "not found".
 - **One-line pytest fixture**, with sane auto-named cassettes.
-- **Clean, typed, extensible core** (see [ARCHITECTURE.md](ARCHITECTURE.md)) — swap the matcher, redactor, or storage backend.
+- **Clean, typed, extensible core** (see [ARCHITECTURE.md](ARCHITECTURE.md)): swap the matcher, redactor, or storage backend.
 
 ## Install
 
@@ -71,7 +71,7 @@ with standin.use_cassette("tests/cassettes/haiku.json"):
 | Mode | Behavior |
 | --- | --- |
 | `once` (default) | Replay if the cassette exists, otherwise record it. |
-| `none` | Replay only. **Errors on any unrecorded call** — use this in CI. |
+| `none` | Replay only. **Errors on any unrecorded call**; use this in CI. |
 | `all` | Always re-record, ignoring existing interactions. |
 | `new_episodes` | Replay what's recorded, record anything new (great for agent loops). |
 
@@ -131,7 +131,7 @@ Everything is a small protocol you can replace (see [ARCHITECTURE.md](ARCHITECTU
 standin.use_cassette(path, matcher=MyMatcher(), redactor=MyRedactor(), store=MyStore())
 ```
 
-- **Matcher** — decide when a live request equals a recorded one. Three ship:
+- **Matcher**: decide when a live request equals a recorded one. Three ship:
   `DefaultMatcher` (exact, JSON key-order-insensitive), `FuzzyMatcher` (body may
   drift up to a string-similarity threshold, so a reworded prompt still replays),
   and `SemanticMatcher` (body matches on embedding cosine similarity, so a
@@ -143,12 +143,12 @@ standin.use_cassette(path, matcher=MyMatcher(), redactor=MyRedactor(), store=MyS
   from standin import use_cassette, FuzzyMatcher, SemanticMatcher, DefaultRedactor
   with use_cassette(path, matcher=FuzzyMatcher(DefaultRedactor(), threshold=0.9)):
       ...
-  # embed: Callable[[str], Sequence[float]] — wire your own model or service.
+  # embed: Callable[[str], Sequence[float]]; wire your own model or service.
   with use_cassette(path, matcher=SemanticMatcher(embed, DefaultRedactor(), threshold=0.95)):
       ...
   ```
-- **Redactor** — control what gets scrubbed before writing.
-- **CassetteStore** — change the on-disk format.
+- **Redactor**: control what gets scrubbed before writing.
+- **CassetteStore**: change the on-disk format.
 
 ## Command line
 
@@ -174,7 +174,7 @@ standin verify tests/cassettes/*.json
 The scanner and the redactor share one set of rules, so anything `scrub` masks is
 exactly what `verify` looks for.
 
-`diff` compares two cassettes interaction by interaction — handy for reviewing what
+`diff` compares two cassettes interaction by interaction, handy for reviewing what
 a re-record changed. It matches requests the same way replay does, then reports which
 interactions are only in the first, only in the second, and which match by request but
 whose response changed (status and/or body). It exits `0` when the two are identical,
@@ -183,12 +183,6 @@ whose response changed (status and/or body). It exits `0` when the two are ident
 ```bash
 standin diff old.json tests/cassettes/summary.json
 ```
-
-## Roadmap
-
-Embedding-based semantic matching shipped in 0.4 as `SemanticMatcher`, a
-dependency-free drop-in (`FuzzyMatcher` still covers string-similarity drift, and
-`DefaultMatcher` stays the exact default).
 
 ## Contributing
 

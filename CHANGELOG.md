@@ -60,7 +60,7 @@ All notable changes to this project are documented here. The format follows
 ### Added
 - `SemanticMatcher`: match method/url exactly but compare request bodies by
   embedding cosine similarity, so a paraphrased prompt still replays. It stays
-  dependency-free — you pass an `embed` callable (`str -> Sequence[float]`), so it
+  dependency-free: you pass an `embed` callable (`str -> Sequence[float]`), so it
   works with sentence-transformers, an embeddings API, or anything else. Cosine is
   computed in pure Python.
 - Runnable examples for the Anthropic SDK and litellm under `examples/`, and an
@@ -105,5 +105,11 @@ All notable changes to this project are documented here. The format follows
 - JSON-body-aware matching; ordered replay for repeated calls (agent loops).
 - Pluggable `Matcher`, `Redactor`, and `CassetteStore` protocols.
 
-[Unreleased]: https://github.com/eeshsaxena/standin/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/eeshsaxena/standin/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/eeshsaxena/standin/compare/v0.6.0...v0.7.0
+[0.6.0]: https://github.com/eeshsaxena/standin/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/eeshsaxena/standin/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/eeshsaxena/standin/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/eeshsaxena/standin/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/eeshsaxena/standin/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/eeshsaxena/standin/releases/tag/v0.1.0

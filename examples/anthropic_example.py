@@ -3,8 +3,8 @@
     pytest examples/anthropic_example.py -p standin.pytest_plugin
 
 First run records against the real API (needs ANTHROPIC_API_KEY); every run after
-replays from tests/cassettes/ — offline, free, deterministic. Nothing about your
-code changes; you only wrap the test.
+replays from examples/cassettes/, offline, free, and deterministic. Nothing about
+your code changes; you only wrap the test.
 """
 import pytest
 

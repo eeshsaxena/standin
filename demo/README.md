@@ -24,7 +24,7 @@ pytest demo/test_summary.py -p standin.pytest_plugin -q   # first run records
 pytest demo/test_summary.py -p standin.pytest_plugin -q   # replays, offline
 ```
 
-(The `-p` flag isn't needed once `standin` is `pip install`ed — the plugin loads
+(The `-p` flag isn't needed once `standin` is `pip install`ed; the plugin loads
 automatically.)
 
 ## Regenerating the GIF

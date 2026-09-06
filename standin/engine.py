@@ -2,7 +2,7 @@
 
 The engine is deliberately transport-agnostic: it speaks only ``RawRequest`` /
 ``RawResponse`` and a ``do_real`` callback. Interceptors adapt a concrete client
-(httpx today, others later) to this interface, so all the decision logic lives
+(httpx, requests, aiohttp) to this interface, so all the decision logic lives
 here in one testable place.
 """
 from __future__ import annotations

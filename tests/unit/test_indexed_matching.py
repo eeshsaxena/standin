@@ -82,7 +82,7 @@ def test_empty_cassette_misses():
 
 def test_record_then_replay_keeps_index_consistent():
     # Index built on the first (missing) lookup, then a fresh recording is appended
-    # and must be findable without a rebuild — the new_episodes path.
+    # and must be findable without a rebuild, the new_episodes path.
     c = Cassette(path="x", interactions=[_rec("old", 0)])
     assert _rid(c.find_unplayed_indexed(MATCHER.live_key, MATCHER.stored_key, _live("new"))) is None
     c.append(_rec("new", 1))

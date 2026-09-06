@@ -24,12 +24,13 @@ clients (or storage formats, matchers, redactors) additive rather than invasive.
             ▲
             │  RawRequest / RawResponse  (transport-neutral)
             │
-      ┌─────┴───────────────┐
-      │    Interceptor       │   <- transport glue (interceptors/)
-      │  HttpxInterceptor    │
-      └─────────────────────┘
+      ┌─────┴───────────────────────────────┐
+      │   Interceptor                         │   <- transport glue (interceptors/)
+      │   Httpx / Requests / Aiohttp          │
+      └───────────────────────────────────────┘
               │
-        httpx.HTTPTransport (patched once, inert until a cassette is open)
+        httpx, requests, and aiohttp transports, each patched once
+        and inert until a cassette is open
 ```
 
 ## Modules
@@ -39,12 +40,12 @@ clients (or storage formats, matchers, redactors) additive rather than invasive.
 | `models.py` | Data types. `RawRequest/RawResponse` (in-flight, bytes) vs `RecordedRequest/RecordedResponse/Interaction` (on disk). `Mode` enum. |
 | `_codec.py` | Body encode/decode + canonicalization for matching. |
 | `redaction.py` | `Redactor` protocol; `DefaultRedactor` (headers + secret patterns), `NullRedactor`. |
-| `matching.py` | `Matcher` protocol; `DefaultMatcher` (method/url/body, JSON-aware). |
+| `matching.py` | `Matcher` protocol; `DefaultMatcher` (method/url/body, JSON-aware), `FuzzyMatcher` (string-similarity drift), `SemanticMatcher` (embedding cosine). `KeyedMatcher` marks a matcher whose match is key equality, so the cassette can index it. |
 | `storage.py` | `CassetteStore` protocol; `JSONCassetteStore`. |
-| `cassette.py` | In-memory interactions + the ordered replay cursor. |
+| `cassette.py` | In-memory interactions, the ordered replay cursor, and a lazily built key -> queue index that makes lookups for keyed matchers O(1). |
 | `config.py` | Wires the pieces; validates `mode`; picks the redactor. |
 | `engine.py` | The **policy**: replay-or-record, per `Mode`. Transport-neutral. |
-| `interceptors/` | Adapters from a concrete client to the engine. `HttpxInterceptor` today. |
+| `interceptors/` | Adapters from a concrete client to the engine: `HttpxInterceptor`, `RequestsInterceptor`, `AiohttpInterceptor`. |
 | `core.py` | `use_cassette` context manager: build config → engine → activate. |
 | `pytest_plugin.py` | `standin` fixture + `@pytest.mark.standin`. |
 
@@ -59,15 +60,17 @@ against an unplayed `Interaction` → decodes the stored response → returns it
 **without any network call**.
 
 The active engine lives in a `ContextVar`, so recording is correct across threads
-and asyncio, and the httpx patch is completely inert whenever no cassette is open.
+and asyncio, and the transport patches are completely inert whenever no cassette
+is open.
 
 ## Extension points
 
 Every collaborator is a `Protocol`, so you can pass your own:
 
-- **Interceptor** — support another client (`requests`, `aiohttp`). The engine
-  is already transport-neutral; you only translate that client's request/response
-  to `RawRequest`/`RawResponse`.
-- **Matcher** — change when a live request equals a recording (e.g. semantic).
-- **Redactor** — change what gets scrubbed.
-- **CassetteStore** — change the on-disk format (YAML, a single archive, ...).
+- **Interceptor**: support another client. `httpx`, `requests`, and `aiohttp`
+  ship; the engine is transport-neutral, so a new one only translates that
+  client's request/response to `RawRequest`/`RawResponse`.
+- **Matcher**: change when a live request equals a recording. `DefaultMatcher`,
+  `FuzzyMatcher`, and `SemanticMatcher` ship.
+- **Redactor**: change what gets scrubbed.
+- **CassetteStore**: change the on-disk format (YAML, a single archive, ...).
