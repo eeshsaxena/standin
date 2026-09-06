@@ -1,4 +1,5 @@
 from standin import _codec
+from standin.redaction import DefaultRedactor
 
 
 def test_json_roundtrip():
@@ -66,3 +67,25 @@ def test_binary_body_canonicalizes_the_same_live_and_stored():
 
 def test_canonical_stored_unrecognized_is_empty_string():
     assert _codec.canonical_stored({"surprise": 1}) == ""
+
+
+def test_form_urlencoded_body_redacts_secret_by_key_name():
+    # A form-encoded OAuth token exchange must not leave client_secret in the clear;
+    # field-name redaction (not just token shapes) has to reach form bodies.
+    r = DefaultRedactor()
+    raw = b"grant_type=client_credentials&client_secret=plainsecretvalue&client_id=abc"
+    enc = _codec.encode_body(raw, "application/x-www-form-urlencoded", r)
+    assert "plainsecretvalue" not in enc["text"]
+    assert "[REDACTED]" in enc["text"]
+    assert "client_id=abc" in enc["text"]
+
+
+def test_form_urlencoded_live_and_stored_canonicalize_the_same():
+    # Record and replay must produce the same canonical form for a form body that
+    # carried a secret, or a redacted recording could never re-match.
+    r = DefaultRedactor()
+    raw = b"client_secret=plainsecretvalue&x=1"
+    stored = _codec.canonical_stored(_codec.encode_body(raw, "application/x-www-form-urlencoded", r))
+    live = _codec.canonical_live(raw, "application/x-www-form-urlencoded", r)
+    assert live == stored
+    assert "plainsecretvalue" not in live

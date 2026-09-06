@@ -27,21 +27,34 @@ def _load(path: str):
     return JSONCassetteStore().load(Path(path))
 
 
-def _redact_body(body: dict, r: DefaultRedactor) -> dict:
+def _content_type(headers) -> str:
+    if isinstance(headers, dict):
+        for k, v in headers.items():
+            if isinstance(k, str) and k.lower() == "content-type" and isinstance(v, str):
+                return v
+    return ""
+
+
+def _is_form(content_type: str) -> bool:
+    return "application/x-www-form-urlencoded" in (content_type or "").lower()
+
+
+def _redact_body(body: dict, r: DefaultRedactor, content_type: str = "") -> dict:
     if "json" in body:
         return {"json": r.redact_obj(body["json"])}
     if "text" in body:
-        return {"text": r.redact_text(body["text"])}
+        text = body["text"]
+        return {"text": r.redact_query(text) if _is_form(content_type) else r.redact_text(text)}
     return body
 
 
-def _scan_body(body, r: DefaultRedactor) -> list[tuple[str, str]]:
+def _scan_body(body, r: DefaultRedactor, content_type: str = "") -> list[tuple[str, str]]:
     if not isinstance(body, dict):
         return []
     if "json" in body:
         return r.scan_obj(body["json"])
     if "text" in body:
-        return r.scan_obj(body["text"])
+        return r.scan_query(body["text"]) if _is_form(content_type) else r.scan_obj(body["text"])
     return []
 
 
@@ -74,10 +87,13 @@ def cmd_scrub(args) -> int:
     items = store.load(path)
     r = DefaultRedactor()
     for it in items:
+        req_ct = _content_type(it.request.headers)
+        resp_ct = _content_type(it.response.headers)
+        it.request.url = r.redact_url(it.request.url)
         it.request.headers = r.redact_headers(it.request.headers)
         it.response.headers = r.redact_headers(it.response.headers)
-        it.request.body = _redact_body(it.request.body, r)
-        it.response.body = _redact_body(it.response.body, r)
+        it.request.body = _redact_body(it.request.body, r, req_ct)
+        it.response.body = _redact_body(it.response.body, r, resp_ct)
     store.save(path, items)
     print(f"scrubbed {len(items)} interaction(s) in {path}")
     return 0
@@ -97,11 +113,16 @@ def cmd_verify(args) -> int:
     r = DefaultRedactor()
     findings: list[str] = []
     for i, it in enumerate(items):
+        for loc, snippet in r.scan_url(it.request.url):
+            findings.append(f"  [{i}] request {loc}: {snippet}")
         for label, headers in (("request", it.request.headers), ("response", it.response.headers)):
             for name, snippet in r.scan_headers(headers):
                 findings.append(f"  [{i}] {label} header {name}: {snippet}")
-        for label, body in (("request", it.request.body), ("response", it.response.body)):
-            for loc, snippet in _scan_body(body, r):
+        for label, body, ct in (
+            ("request", it.request.body, _content_type(it.request.headers)),
+            ("response", it.response.body, _content_type(it.response.headers)),
+        ):
+            for loc, snippet in _scan_body(body, r, ct):
                 findings.append(f"  [{i}] {label} body {loc}: {snippet}")
 
     if findings:
@@ -232,6 +253,14 @@ def main(argv=None) -> int:
     except IndexError:
         print("error: interaction index out of range", file=sys.stderr)
         return 1
+    except CassetteError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except RecursionError:
+        # A hand-crafted, pathologically nested cassette (e.g. pulled from a PR)
+        # must not crash the tool with a traceback.
+        print("error: cassette is too deeply nested to process", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

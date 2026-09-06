@@ -121,3 +121,102 @@ def test_scan_obj_on_a_bare_string_reports_value_location():
     r = DefaultRedactor()
     hits = r.scan_obj("here is sk-ant-" + "a" * 24 + " oops")
     assert hits and hits[0][0] == "value"
+
+
+# -- URL redaction (secrets in query params, basic-auth userinfo) --------------
+def test_redact_url_masks_secret_query_param_by_name():
+    r = DefaultRedactor()
+    out = r.redact_url("https://api.example.com/v1?api_key=plainlooking&user=bob")
+    assert "plainlooking" not in out
+    assert "[REDACTED]" in out
+    assert "user=bob" in out  # benign params preserved
+
+
+def test_redact_url_masks_google_key_and_shaped_tokens():
+    r = DefaultRedactor()
+    out = r.redact_url("https://gen.googleapis.com/v1?key=AIza" + "b" * 35)
+    assert "AIza" + "b" * 35 not in out
+
+
+def test_redact_url_strips_basic_auth_userinfo():
+    r = DefaultRedactor()
+    out = r.redact_url("https://alice:s3cr3tPassw0rd@api.example.com/v1/x")
+    assert "s3cr3tPassw0rd" not in out
+    assert "api.example.com" in out
+
+
+def test_redact_url_leaves_clean_url_untouched():
+    r = DefaultRedactor()
+    url = "https://api.example.com/v1/models?model=gpt-4o&stream=true"
+    assert r.redact_url(url) == url
+
+
+def test_redact_url_is_idempotent():
+    r = DefaultRedactor()
+    once = r.redact_url("https://u:p@api.example.com/v1?api_key=sk-ant-" + "z" * 24)
+    assert r.redact_url(once) == once
+
+
+def test_scan_url_flags_userinfo_and_query_secret():
+    r = DefaultRedactor()
+    hits = r.scan_url("https://alice:hunter2pw@api.example.com/v1?api_key=plainish")
+    locs = {loc for loc, _ in hits}
+    assert "url userinfo" in locs
+    assert any(loc.startswith("url query") for loc in locs)
+
+
+def test_scan_url_clean_after_redaction():
+    r = DefaultRedactor()
+    dirty = "https://u:p@api.example.com/v1?api_key=sk-proj-" + "A" * 24
+    assert r.scan_url(r.redact_url(dirty)) == []
+
+
+# -- form-urlencoded body redaction --------------------------------------------
+def test_redact_query_masks_client_secret_by_name():
+    r = DefaultRedactor()
+    out = r.redact_query("grant_type=client_credentials&client_secret=topsecretvalue&x=1")
+    assert "topsecretvalue" not in out
+    assert "[REDACTED]" in out
+
+
+def test_scan_query_flags_and_is_clean_after():
+    r = DefaultRedactor()
+    body = "grant_type=x&password=hunter2pw"
+    assert r.scan_query(body)
+    assert r.scan_query(r.redact_query(body)) == []
+
+
+# -- extended field names / JWT ------------------------------------------------
+def test_token_and_id_token_field_names_masked():
+    r = DefaultRedactor()
+    out = r.redact_obj({"token": "opaqueSessionValue", "id_token": "anything", "keep": "hi"})
+    assert out["token"] == "[REDACTED]"
+    assert out["id_token"] == "[REDACTED]"
+    assert out["keep"] == "hi"
+
+
+def test_jwt_value_is_redacted():
+    r = DefaultRedactor()
+    jwt = ("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+           ".eyJzdWIiOiIxMjM0NTY3ODkwIn0"
+           ".dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U")
+    assert r.redact_text(f"token={jwt}") != f"token={jwt}"
+    assert jwt not in r.redact_text(jwt)
+
+
+def test_shaped_token_in_unlisted_header_is_stripped():
+    # A secret-shaped token in a header we don't know by name should still be
+    # scrubbed out of the recording (not just flagged by verify).
+    r = DefaultRedactor()
+    out = r.redact_headers({"X-Custom": "key sk-ant-" + "a" * 24 + " end", "X-Keep": "plain"})
+    assert "sk-ant-" not in out["X-Custom"]
+    assert out["X-Keep"] == "plain"
+
+
+def test_jwt_pattern_no_catastrophic_backtracking():
+    import time
+    r = DefaultRedactor()
+    payload = "eyJ" + "A" * 200000  # long run that must not hang the JWT regex
+    start = time.perf_counter()
+    r.redact_text(payload)
+    assert time.perf_counter() - start < 1.0

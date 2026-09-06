@@ -22,7 +22,7 @@ from .models import Mode
 from .redaction import DefaultRedactor, NullRedactor, Redactor
 from .storage import CassetteStore, JSONCassetteStore
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 __all__ = [
     "use_cassette",
     "Config",

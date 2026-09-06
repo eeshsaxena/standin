@@ -6,6 +6,33 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-06
+
+### Security
+- Redact secrets in request URLs. Recording now strips basic-auth credentials
+  from the URL (`https://user:pass@host` -> `https://[REDACTED]@host`), masks
+  secret query-string values by key name (`?api_key=`, `?access_token=`,
+  Google's `?key=`, signed-URL `?sig=`/`?signature=`, ...), and sweeps the URL
+  for any secret-shaped token. Previously the URL was written verbatim, so a key
+  in a query param or basic-auth in the URL landed in the committed cassette.
+- `standin verify` now scans the URL as well as headers and bodies, so a secret
+  in a query param or in the URL userinfo fails the gate instead of passing it.
+  `standin scrub` likewise redacts the URL.
+- Redact secrets in `application/x-www-form-urlencoded` bodies by field name
+  (e.g. an OAuth `client_secret=...` token exchange), not just by token shape.
+- Broaden default coverage: mask the `token`, `id_token`, `session_token`, and
+  `private_key` field names, recognise JSON Web Tokens, and strip a
+  secret-shaped token out of any header value even when the header name is not
+  on the known-sensitive list.
+
+### Changed
+- The `DefaultMatcher`/`FuzzyMatcher`/`SemanticMatcher` redact the URL on both
+  the live and stored sides before comparing, so record/replay still line up
+  after the stored URL is redacted (existing raw-URL cassettes keep replaying).
+- `standin list`/`stats`/`show`/`scrub` now report a clean error (exit 2) on a
+  malformed cassette instead of dumping a traceback, and a pathologically nested
+  cassette raises `CassetteError` rather than an uncaught `RecursionError`.
+
 ## [0.7.0] - 2026-09-06
 
 ### Changed
@@ -105,7 +132,8 @@ All notable changes to this project are documented here. The format follows
 - JSON-body-aware matching; ordered replay for repeated calls (agent loops).
 - Pluggable `Matcher`, `Redactor`, and `CassetteStore` protocols.
 
-[Unreleased]: https://github.com/eeshsaxena/standin/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/eeshsaxena/standin/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/eeshsaxena/standin/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/eeshsaxena/standin/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/eeshsaxena/standin/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/eeshsaxena/standin/compare/v0.4.0...v0.5.0

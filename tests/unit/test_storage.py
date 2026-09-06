@@ -38,3 +38,18 @@ def test_unsupported_version_raises(tmp_path):
     p.write_text('{"version": 999, "interactions": []}', encoding="utf-8")
     with pytest.raises(CassetteError):
         JSONCassetteStore().load(p)
+
+
+def test_deeply_nested_json_raises_cassette_error(tmp_path):
+    # A hostile cassette with pathological nesting must surface as a clean
+    # CassetteError, never an uncaught RecursionError / process crash.
+    p = tmp_path / "deep.json"
+    depth = 30000
+    p.write_text(
+        '{"version": 1, "interactions": [{"request": {"method":"GET","url":"http://x",'
+        '"headers":{},"body":{"json": %s}}, "response":{"status_code":200,"headers":{},'
+        '"body":{"empty":true}}}]}' % ("[" * depth + "]" * depth),
+        encoding="utf-8",
+    )
+    with pytest.raises(CassetteError):
+        JSONCassetteStore().load(p)

@@ -11,6 +11,20 @@ import json
 from typing import Any
 
 
+def _is_form_urlencoded(content_type: str) -> bool:
+    return "application/x-www-form-urlencoded" in (content_type or "").lower()
+
+
+def _redact_text_body(text: str, content_type: str, redactor: Any) -> str:
+    """Redact a text body: form-urlencoded bodies get key-aware redaction (so
+    ``client_secret=...`` is masked by name), everything else gets a token sweep."""
+    if _is_form_urlencoded(content_type):
+        redact_query = getattr(redactor, "redact_query", None)
+        if callable(redact_query):
+            return redact_query(text)
+    return redactor.redact_text(text)
+
+
 def _try_json(raw: bytes, content_type: str) -> Any | None:
     if "application/json" not in (content_type or ""):
         # Some providers omit the header; still try if it smells like JSON.
@@ -34,7 +48,7 @@ def encode_body(raw: bytes, content_type: str, redactor=None) -> dict[str, Any]:
     try:
         text = raw.decode("utf-8")
         if redactor is not None:
-            text = redactor.redact_text(text)
+            text = _redact_text_body(text, content_type, redactor)
         return {"text": text}
     except UnicodeDecodeError:
         return {"b64": base64.b64encode(raw).decode("ascii")}
@@ -63,7 +77,7 @@ def canonical_live(raw: bytes, content_type: str, redactor=None) -> str:
         return json.dumps(obj, sort_keys=True, ensure_ascii=False)
     try:
         text = raw.decode("utf-8")
-        return redactor.redact_text(text) if redactor is not None else text
+        return _redact_text_body(text, content_type, redactor) if redactor is not None else text
     except UnicodeDecodeError:
         return base64.b64encode(raw).decode("ascii")
 

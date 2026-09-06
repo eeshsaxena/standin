@@ -25,7 +25,7 @@ from .models import (
     RecordedRequest,
     RecordedResponse,
 )
-from .redaction import DefaultRedactor
+from .redaction import DefaultRedactor, redact_url_via
 
 SyncReal = Callable[[RawRequest], RawResponse]
 AsyncReal = Callable[[RawRequest], Awaitable[RawResponse]]
@@ -65,7 +65,7 @@ class Engine:
         self.cassette.append(Interaction(
             request=RecordedRequest(
                 method=request.method.upper(),
-                url=request.url,
+                url=redact_url_via(self.redactor, request.url),
                 headers=self.redactor.redact_headers(request.headers),
                 body=_codec.encode_body(request.body, _ct(request.headers), self.redactor),
             ),

@@ -147,6 +147,76 @@ def test_cli_verify_tolerates_non_dict_body(tmp_path, capsys):
     assert "OK: no suspected secrets" in capsys.readouterr().out
 
 
+def test_cli_verify_flags_secret_in_url(tmp_path, capsys):
+    # A live secret in the request URL (query param) must not slip past verify.
+    p = tmp_path / "c.json"
+    JSONCassetteStore().save(p, [Interaction(
+        request=RecordedRequest("GET", "https://api/x?api_key=sk-proj-" + "A" * 24, {}, {"empty": True}),
+        response=RecordedResponse(200, {}, {"json": {"ok": True}}),
+    )])
+    assert main(["verify", str(p)]) == 1
+    out = capsys.readouterr().out
+    assert "FAIL" in out
+    assert "url" in out and "api_key" in out
+
+
+def test_cli_verify_flags_basic_auth_in_url(tmp_path, capsys):
+    p = tmp_path / "c.json"
+    JSONCassetteStore().save(p, [Interaction(
+        request=RecordedRequest("GET", "https://user:s3cretPass@api/x", {}, {"empty": True}),
+        response=RecordedResponse(200, {}, {"json": {"ok": True}}),
+    )])
+    assert main(["verify", str(p)]) == 1
+    assert "userinfo" in capsys.readouterr().out
+
+
+def test_cli_scrub_redacts_url_then_verify_passes(tmp_path):
+    p = tmp_path / "c.json"
+    JSONCassetteStore().save(p, [Interaction(
+        request=RecordedRequest("GET", "https://user:pw@api/x?api_key=sk-proj-" + "A" * 24, {}, {"empty": True}),
+        response=RecordedResponse(200, {}, {"json": {"ok": True}}),
+    )])
+    assert main(["scrub", str(p)]) == 0
+    text = p.read_text(encoding="utf-8")
+    assert "sk-proj-" not in text and "user:pw@" not in text
+    assert main(["verify", str(p)]) == 0
+
+
+def test_cli_verify_flags_form_urlencoded_secret(tmp_path, capsys):
+    p = tmp_path / "c.json"
+    JSONCassetteStore().save(p, [Interaction(
+        request=RecordedRequest(
+            "POST", "http://api/token",
+            {"content-type": "application/x-www-form-urlencoded"},
+            {"text": "grant_type=x&client_secret=plainsecretvalue"},
+        ),
+        response=RecordedResponse(200, {}, {"json": {"ok": True}}),
+    )])
+    assert main(["verify", str(p)]) == 1
+    assert "client_secret" in capsys.readouterr().out
+
+
+def test_cli_list_on_malformed_cassette_is_clean(tmp_path, capsys):
+    # A malformed cassette (e.g. pulled from a PR) must not dump a traceback from
+    # list/stats/show/scrub; they should report a clean error and exit 2.
+    p = tmp_path / "bad.json"
+    p.write_text("{ not valid json", encoding="utf-8")
+    assert main(["list", str(p)]) == 2
+    assert main(["stats", str(p)]) == 2
+    assert "error:" in capsys.readouterr().err
+
+
+def test_cli_verify_on_deeply_nested_cassette_is_clean(tmp_path, capsys):
+    p = tmp_path / "deep.json"
+    depth = 30000
+    body = ('{"version": 1, "interactions": [{"request": {"method":"GET","url":"http://x",'
+            '"headers":{},"body":{"json": %s}}, "response":{"status_code":200,"headers":{},'
+            '"body":{"empty":true}}}]}') % ("[" * depth + "]" * depth)
+    p.write_text(body, encoding="utf-8")
+    assert main(["verify", str(p)]) == 2
+    assert "error:" in capsys.readouterr().err
+
+
 def test_cli_scrub_and_verify_handle_text_and_b64_bodies(tmp_path, capsys):
     # A text body carrying a token, plus a base64 body that scrub/verify must pass
     # through untouched (the non-json/non-text branches).

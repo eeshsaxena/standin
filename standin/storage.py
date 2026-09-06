@@ -38,6 +38,10 @@ class JSONCassetteStore:
             data = json.loads(path.read_text(encoding="utf-8"))
         except ValueError as exc:
             raise CassetteError(f"cassette {path} is not valid JSON: {exc}") from exc
+        except RecursionError as exc:
+            # Pathologically nested JSON (a hostile cassette) must surface as a
+            # clean CassetteError, not an uncaught RecursionError.
+            raise CassetteError(f"cassette {path} is too deeply nested to parse") from exc
         version = data.get("version")
         if version != FORMAT_VERSION:
             raise CassetteError(f"cassette {path} has unsupported version {version!r}")

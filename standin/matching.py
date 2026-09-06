@@ -22,7 +22,7 @@ from typing import Protocol, runtime_checkable
 
 from . import _codec
 from .models import RawRequest, RecordedRequest
-from .redaction import Redactor
+from .redaction import Redactor, redact_url_via
 
 DEFAULT_MATCH_ON = ("method", "url", "body")
 _SEP = ""
@@ -60,7 +60,10 @@ class DefaultMatcher:
         if "method" in self._match_on:
             parts.append(request.method.upper())
         if "url" in self._match_on:
-            parts.append(request.url)
+            # Redact the URL on both sides identically, so a secret in the URL never
+            # leaks into the match key and record/replay still line up after the
+            # stored URL was redacted.
+            parts.append(redact_url_via(self._redactor, request.url))
         if "body" in self._match_on:
             parts.append(_codec.canonical_live(request.body, _content_type(request.headers), self._redactor))
         return _SEP.join(parts)
@@ -70,7 +73,7 @@ class DefaultMatcher:
         if "method" in self._match_on:
             parts.append(request.method.upper())
         if "url" in self._match_on:
-            parts.append(request.url)
+            parts.append(redact_url_via(self._redactor, request.url))
         if "body" in self._match_on:
             parts.append(_codec.canonical_stored(request.body))
         return _SEP.join(parts)
@@ -91,7 +94,9 @@ class FuzzyMatcher:
     def matches(self, live: RawRequest, stored: RecordedRequest) -> bool:
         if "method" in self._match_on and live.method.upper() != stored.method.upper():
             return False
-        if "url" in self._match_on and live.url != stored.url:
+        if "url" in self._match_on and redact_url_via(self._redactor, live.url) != redact_url_via(
+            self._redactor, stored.url
+        ):
             return False
         if "body" in self._match_on:
             lb = _codec.canonical_live(live.body, _content_type(live.headers), self._redactor)
@@ -122,7 +127,9 @@ class SemanticMatcher:
     def matches(self, live: RawRequest, stored: RecordedRequest) -> bool:
         if "method" in self._match_on and live.method.upper() != stored.method.upper():
             return False
-        if "url" in self._match_on and live.url != stored.url:
+        if "url" in self._match_on and redact_url_via(self._redactor, live.url) != redact_url_via(
+            self._redactor, stored.url
+        ):
             return False
         if "body" in self._match_on:
             lb = _codec.canonical_live(live.body, _content_type(live.headers), self._redactor)
