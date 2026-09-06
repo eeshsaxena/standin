@@ -33,6 +33,21 @@ class Matcher(Protocol):
     def matches(self, live: RawRequest, stored: RecordedRequest) -> bool: ...
 
 
+@runtime_checkable
+class KeyedMatcher(Protocol):
+    """A matcher whose ``matches`` is exactly ``live_key(live) == stored_key(stored)``.
+
+    Exposing the two key functions lets the cassette index interactions by key and
+    look them up in O(1) instead of scanning. ``DefaultMatcher`` qualifies;
+    ``FuzzyMatcher`` and ``SemanticMatcher`` deliberately do not (their match is a
+    similarity test, not key equality), so they keep the linear scan.
+    """
+
+    def live_key(self, request: RawRequest) -> str: ...
+    def stored_key(self, request: RecordedRequest) -> str: ...
+    def matches(self, live: RawRequest, stored: RecordedRequest) -> bool: ...
+
+
 class DefaultMatcher:
     """Exact match on the chosen fields (JSON body compared order-insensitively)."""
 

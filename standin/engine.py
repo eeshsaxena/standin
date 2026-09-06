@@ -16,7 +16,7 @@ from . import _codec
 from .cassette import Cassette
 from .config import Config
 from .exceptions import CannotReplay
-from .matching import DefaultMatcher
+from .matching import DefaultMatcher, KeyedMatcher
 from .models import (
     Interaction,
     Mode,
@@ -50,7 +50,12 @@ class Engine:
         return try_replay, record_on_miss
 
     def _find(self, request: RawRequest):
-        return self.cassette.find_unplayed(self.matcher.matches, request)
+        matcher = self.matcher
+        # Key-based matchers (DefaultMatcher) get the O(1) index; matchers that only
+        # implement `matches` (Fuzzy/Semantic/custom) keep the linear scan.
+        if isinstance(matcher, KeyedMatcher):
+            return self.cassette.find_unplayed_indexed(matcher.live_key, matcher.stored_key, request)
+        return self.cassette.find_unplayed(matcher.matches, request)
 
     def _replay(self, interaction: Interaction) -> RawResponse:
         r = interaction.response
