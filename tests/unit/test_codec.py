@@ -33,3 +33,36 @@ def test_canonical_live_matches_stored_regardless_of_key_order():
     live = _codec.canonical_live(b'{"b": 2, "a": 1}', "application/json")
     stored = _codec.canonical_stored({"json": {"a": 1, "b": 2}})
     assert live == stored
+
+
+def test_invalid_json_with_json_content_type_falls_back_to_text():
+    # The content-type claims JSON but the bytes don't parse: keep them as text
+    # rather than losing the body.
+    enc = _codec.encode_body(b"{not valid json", "application/json")
+    assert enc == {"text": "{not valid json"}
+    assert _codec.canonical_live(b"{not valid json", "application/json") == "{not valid json"
+
+
+def test_decode_unrecognized_body_is_empty_bytes():
+    assert _codec.decode_body({}) == b""
+    assert _codec.decode_body({"surprise": 1}) == b""
+
+
+def test_canonical_empty_bodies_are_the_empty_string():
+    assert _codec.canonical_live(b"", "application/json") == ""
+    assert _codec.canonical_stored({}) == ""
+    assert _codec.canonical_stored({"empty": True}) == ""
+
+
+def test_binary_body_canonicalizes_the_same_live_and_stored():
+    # A non-UTF-8, non-JSON body must produce the same canonical form on record
+    # (stored) and on replay (live), or a binary upload could never re-match.
+    raw = b"\xff\xfe\x00\x01binary"
+    stored = _codec.canonical_stored(_codec.encode_body(raw, "application/octet-stream"))
+    live = _codec.canonical_live(raw, "application/octet-stream")
+    assert live == stored
+    assert live  # base64, non-empty
+
+
+def test_canonical_stored_unrecognized_is_empty_string():
+    assert _codec.canonical_stored({"surprise": 1}) == ""

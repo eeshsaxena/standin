@@ -1,3 +1,5 @@
+import base64
+
 from standin.cli import main
 from standin.models import Interaction, RecordedRequest, RecordedResponse
 from standin.storage import JSONCassetteStore
@@ -122,3 +124,42 @@ def test_cli_diff_malformed_errors(tmp_path, capsys):
     bad.write_text("{ not valid json", encoding="utf-8")
     assert main(["diff", str(a), str(bad)]) == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_cli_diff_reports_only_in_a(tmp_path, capsys):
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    JSONCassetteStore().save(a, [_interaction(), _interaction(url="http://api/gone")])
+    JSONCassetteStore().save(b, [_interaction()])
+    assert main(["diff", str(a), str(b)]) == 1
+    out = capsys.readouterr().out
+    assert "http://api/gone" in out and "only in A" in out
+
+
+def test_cli_verify_tolerates_non_dict_body(tmp_path, capsys):
+    # A legacy or hand-edited cassette may carry a bare-string body; verify must
+    # scan it without crashing.
+    p = tmp_path / "legacy.json"
+    JSONCassetteStore().save(p, [Interaction(
+        request=RecordedRequest("POST", "http://api/x", {}, "a raw string body"),
+        response=RecordedResponse(200, {}, {"json": {"ok": True}}),
+    )])
+    assert main(["verify", str(p)]) == 0
+    assert "OK: no suspected secrets" in capsys.readouterr().out
+
+
+def test_cli_scrub_and_verify_handle_text_and_b64_bodies(tmp_path, capsys):
+    # A text body carrying a token, plus a base64 body that scrub/verify must pass
+    # through untouched (the non-json/non-text branches).
+    p = tmp_path / "c.json"
+    JSONCassetteStore().save(p, [
+        Interaction(
+            request=RecordedRequest("POST", "http://api/x", {}, {"text": "call ghp_" + "a" * 36}),
+            response=RecordedResponse(200, {}, {"b64": base64.b64encode(b"\x00\x01").decode()}),
+        ),
+    ])
+    assert main(["verify", str(p)]) == 1  # token in the text body is flagged
+    assert "body" in capsys.readouterr().out
+
+    assert main(["scrub", str(p)]) == 0
+    assert "ghp_aaaa" not in p.read_text(encoding="utf-8")
+    assert main(["verify", str(p)]) == 0  # clean after scrub

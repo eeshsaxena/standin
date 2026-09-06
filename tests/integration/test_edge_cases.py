@@ -110,3 +110,24 @@ def test_redact_false_keeps_raw(tmp_path, llm_server):
         httpx.post(f"{llm_server.url}/v1/chat", json={"model": "g", "messages": []},
                    headers={"authorization": "Bearer keepme-123"})
     assert "keepme-123" in cass.read_text(encoding="utf-8")
+
+
+def test_custom_store_is_used_instead_of_disk(tmp_path, llm_server):
+    """A caller-supplied store replaces JSON-on-disk entirely."""
+
+    class MemStore:
+        def __init__(self):
+            self.saved = None
+
+        def load(self, path):
+            return []
+
+        def save(self, path, interactions):
+            self.saved = list(interactions)
+
+    store = MemStore()
+    cass = tmp_path / "c.json"
+    with standin.use_cassette(cass, mode="all", store=store):
+        httpx.post(f"{llm_server.url}/v1/chat", json={"model": "g", "messages": []})
+    assert store.saved is not None and len(store.saved) == 1
+    assert not cass.exists()  # the custom store wrote nothing to disk

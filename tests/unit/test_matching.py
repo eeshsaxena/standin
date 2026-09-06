@@ -29,3 +29,12 @@ def test_method_case_insensitive():
     live = RawRequest("post", "http://x", {}, b"")
     stored = RecordedRequest("POST", "http://x", {}, {"empty": True})
     assert m.live_key(live) == m.stored_key(stored)
+
+
+def test_body_sniffed_as_json_without_content_type_header():
+    # No content-type header at all: a JSON-looking body is still canonicalized as
+    # JSON, so it matches the stored recording order-insensitively.
+    m = DefaultMatcher(NullRedactor())
+    live = RawRequest("POST", "http://x/v1", {}, b'{"b":2,"a":1}')
+    stored = RecordedRequest("POST", "http://x/v1", {}, {"json": {"a": 1, "b": 2}})
+    assert m.live_key(live) == m.stored_key(stored)

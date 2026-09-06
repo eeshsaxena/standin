@@ -38,3 +38,10 @@ def test_fuzzy_identical_body_matches_at_any_threshold():
     m = FuzzyMatcher(NullRedactor(), threshold=1.0)
     body = {"model": "gpt", "messages": [{"role": "user", "content": "exact"}]}
     assert m.matches(_live(body), _stored(body))
+
+
+def test_fuzzy_method_must_still_match():
+    m = FuzzyMatcher(NullRedactor(), threshold=0.5)
+    live = RawRequest("GET", "http://x/v1", {"content-type": "application/json"}, b'{"k":1}')
+    stored = RecordedRequest("POST", "http://x/v1", {}, {"json": {"k": 1}})
+    assert not m.matches(live, stored)

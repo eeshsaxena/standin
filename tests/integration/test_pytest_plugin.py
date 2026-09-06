@@ -85,3 +85,29 @@ def test_standin_mode_option_beats_env(pytester, llm_server, monkeypatch):
     pytester.makepyfile(test_inner=_record_probe(llm_server))
     result = pytester.runpytest_inprocess("-p", "standin.pytest_plugin", "--standin-mode=all")
     result.assert_outcomes(passed=1)
+
+
+def test_marker_match_on_flows_through(pytester, llm_server):
+    # The marker's match_on reaches the cassette: recorded with one body, replayed
+    # with a different body, which only matches because body is excluded.
+    pytester.makepyfile(
+        test_inner=f'''
+import httpx
+import pytest
+
+def _post(content):
+    return httpx.post("{llm_server.url}/v1/chat",
+                      json={{"model": "g", "messages": [{{"role": "user", "content": content}}]}})
+
+@pytest.mark.standin(path="mo.json", match_on=["method", "url"], mode="all")
+def test_record(standin):
+    assert _post("one").status_code == 200
+
+@pytest.mark.standin(path="mo.json", match_on=["method", "url"], mode="none")
+def test_replay_with_a_different_body(standin):
+    # Would miss under default (body-sensitive) matching; match_on ignores it.
+    assert _post("TWO different body").status_code == 200
+'''
+    )
+    result = pytester.runpytest_inprocess("-p", "standin.pytest_plugin")
+    result.assert_outcomes(passed=2)

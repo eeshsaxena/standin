@@ -59,3 +59,12 @@ def test_semantic_method_must_still_match():
     live = RawRequest("GET", "http://x/v1", {"content-type": "application/json"}, json.dumps(_msg("hi")).encode())
     stored = RecordedRequest("POST", "http://x/v1", {}, {"json": _msg("hi")})
     assert not m.matches(live, stored)
+
+
+def test_semantic_zero_vector_does_not_match_a_different_body():
+    # An embedder that returns a zero vector (e.g. for out-of-vocabulary text)
+    # must not spuriously match: cosine is guarded to 0, below any threshold.
+    m = SemanticMatcher(lambda _text: [0.0, 0.0, 0.0], NullRedactor(), threshold=0.5)
+    a = _msg("Summarize the quarterly report")
+    b = _msg("Translate this haiku into French")
+    assert not m.matches(_live(a), _stored(b))

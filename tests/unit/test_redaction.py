@@ -106,3 +106,18 @@ def test_scan_clean_after_redaction():
     r = DefaultRedactor()
     obj = {"api_key": "sk-proj-" + "A" * 24, "msg": "sk-ant-" + "z" * 24}
     assert r.scan_obj(r.redact_obj(obj)) == []
+
+
+def test_scan_headers_finds_token_in_a_non_sensitive_header():
+    # A secret can leak into a header we don't mask by name; scan still catches it
+    # by pattern, and a non-string header value is skipped without crashing.
+    r = DefaultRedactor()
+    hits = r.scan_headers({"x-request-id": 12345, "x-note": "key sk-ant-" + "a" * 24})
+    assert len(hits) == 1
+    assert hits[0][0] == "x-note"
+
+
+def test_scan_obj_on_a_bare_string_reports_value_location():
+    r = DefaultRedactor()
+    hits = r.scan_obj("here is sk-ant-" + "a" * 24 + " oops")
+    assert hits and hits[0][0] == "value"
