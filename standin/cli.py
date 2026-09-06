@@ -4,6 +4,7 @@
     standin show    cassette.json 0        # full request/response of interaction 0
     standin stats   cassette.json          # summary counts
     standin scrub   cassette.json          # re-run secret redaction over a cassette
+    standin verify  cassette.json          # fail if a live-looking secret remains
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import __version__
+from .exceptions import CassetteError
 from .redaction import DefaultRedactor
 from .storage import JSONCassetteStore
 
@@ -28,6 +30,16 @@ def _redact_body(body: dict, r: DefaultRedactor) -> dict:
     if "text" in body:
         return {"text": r.redact_text(body["text"])}
     return body
+
+
+def _scan_body(body, r: DefaultRedactor) -> list[tuple[str, str]]:
+    if not isinstance(body, dict):
+        return []
+    if "json" in body:
+        return r.scan_obj(body["json"])
+    if "text" in body:
+        return r.scan_obj(body["text"])
+    return []
 
 
 def cmd_list(args) -> int:
@@ -68,6 +80,36 @@ def cmd_scrub(args) -> int:
     return 0
 
 
+def cmd_verify(args) -> int:
+    try:
+        items = _load(args.cassette)
+    except CassetteError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+    print(f"{args.cassette}: {len(items)} interaction(s)")
+    print(f"  methods  : {dict(Counter(it.request.method for it in items))}")
+    print(f"  statuses : {dict(Counter(it.response.status_code for it in items))}")
+
+    r = DefaultRedactor()
+    findings: list[str] = []
+    for i, it in enumerate(items):
+        for label, headers in (("request", it.request.headers), ("response", it.response.headers)):
+            for name, snippet in r.scan_headers(headers):
+                findings.append(f"  [{i}] {label} header {name}: {snippet}")
+        for label, body in (("request", it.request.body), ("response", it.response.body)):
+            for loc, snippet in _scan_body(body, r):
+                findings.append(f"  [{i}] {label} body {loc}: {snippet}")
+
+    if findings:
+        print(f"\nFAIL: {len(findings)} suspected secret(s) still present:")
+        for line in findings:
+            print(line)
+        return 1
+    print("\nOK: no suspected secrets found")
+    return 0
+
+
 def main(argv=None) -> int:
     reconfigure = getattr(sys.stdout, "reconfigure", None)
     if reconfigure is not None:
@@ -96,6 +138,10 @@ def main(argv=None) -> int:
     p = sub.add_parser("scrub", help="re-run secret redaction over a cassette")
     p.add_argument("cassette")
     p.set_defaults(func=cmd_scrub)
+
+    p = sub.add_parser("verify", help="fail if a live-looking secret remains (CI gate)")
+    p.add_argument("cassette")
+    p.set_defaults(func=cmd_verify)
 
     args = ap.parse_args(argv)
     try:

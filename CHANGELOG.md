@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-06
+
+### Added
+- `standin verify <cassette>`: a "safe to commit?" gate for CI and pre-commit
+  hooks. It prints a summary (interactions, methods, statuses), scans every
+  header and body for anything still shaped like a live secret, prints each
+  finding with its interaction index and location, and exits non-zero if any
+  remain (2 on a malformed/unloadable cassette). The scanner reuses the
+  redactor's rules, so a cassette that passes `scrub` passes `verify`.
+
+### Changed
+- Hardened `DefaultRedactor`. It now also masks the `x-goog-api-key`,
+  `api-key`, `cookie`, and `set-cookie` headers; recognises OpenAI project
+  keys, AWS access-key ids, and Google API keys by shape; and redacts common
+  secret field names (`api_key`, `access_token`, `refresh_token`, `password`,
+  `client_secret`, ...) regardless of value. New `extra_field_names=[...]`
+  constructor argument for custom field names; `extra_headers` and
+  `extra_patterns` are unchanged. Redaction stays idempotent and fails safe on
+  nested or non-string inputs.
+
 ## [0.4.0] - 2026-09-06
 
 ### Added

@@ -23,7 +23,7 @@ VCR.py is great, but it's a general HTTP tool. `standin` is built for LLMs:
 
 - **Provider-agnostic, zero wiring.** It hooks `httpx`, `requests`, and `aiohttp`, so it works with **OpenAI, Anthropic, Gemini, Mistral, Cohere, litellm, LangChain, LlamaIndex** and anything else built on those three clients. No per-SDK adapters.
 - **Streaming just works.** Server-sent event (SSE) responses are recorded and replayed intact.
-- **Safe to commit.** API keys in headers and secret-looking tokens in bodies are **redacted automatically**, so cassettes can live in a public repo.
+- **Safe to commit.** Auth headers, secret-shaped tokens (OpenAI, Anthropic, AWS, Google, GitHub, Slack), and secret field names in bodies are **redacted automatically**, so cassettes can live in a public repo. `standin verify` re-checks a cassette in CI and fails if anything still looks live.
 - **Body-aware matching.** Requests match on normalized JSON, so key ordering and formatting noise don't break replays. Repeated identical calls (agent loops) replay in order.
 - **Replay misses explain themselves.** When no recording matches in replay-only mode, the error names the closest recording and shows a field-level diff (or tells you the recording was already replayed), instead of a bare "not found".
 - **One-line pytest fixture**, with sane auto-named cassettes.
@@ -133,11 +133,25 @@ standin.use_cassette(path, matcher=MyMatcher(), redactor=MyRedactor(), store=MyS
 ## Command line
 
 ```bash
-standin list  tests/cassettes/summary.json     # one line per interaction
-standin show  tests/cassettes/summary.json 0   # full request/response
-standin stats tests/cassettes/summary.json     # counts by method/status
-standin scrub tests/cassettes/summary.json     # re-run secret redaction in place
+standin list   tests/cassettes/summary.json    # one line per interaction
+standin show   tests/cassettes/summary.json 0  # full request/response
+standin stats  tests/cassettes/summary.json    # counts by method/status
+standin scrub  tests/cassettes/summary.json    # re-run secret redaction in place
+standin verify tests/cassettes/summary.json    # exit non-zero if a secret remains
 ```
+
+`verify` is a **"safe to commit?" gate**: it prints a summary, then scans every
+header and body for anything still shaped like a live secret (OpenAI/Anthropic/AWS/
+Google keys, auth headers, secret field names). A clean cassette exits `0`; any
+finding is printed with its location and exits non-zero, so it drops into CI or a
+pre-commit hook:
+
+```bash
+standin verify tests/cassettes/*.json
+```
+
+The scanner and the redactor share one set of rules, so anything `scrub` masks is
+exactly what `verify` looks for.
 
 ## Roadmap
 

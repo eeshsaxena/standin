@@ -47,3 +47,37 @@ def test_cli_scrub_redacts_secrets(tmp_path):
     assert "sk-live-SECRET" not in text  # header value masked
     assert "ghp_aaaa" not in text  # body token masked
     assert "[REDACTED]" in text
+
+
+def test_cli_verify_clean_exits_zero(tmp_path, capsys):
+    p = tmp_path / "c.json"
+    _write(p, headers={"authorization": "[REDACTED]"}, body={"json": {"model": "gpt-4o"}})
+    assert main(["verify", str(p)]) == 0
+    out = capsys.readouterr().out
+    assert "1 interaction" in out
+    assert "OK: no suspected secrets" in out
+
+
+def test_cli_verify_flags_live_secret(tmp_path, capsys):
+    p = tmp_path / "c.json"
+    _write(p, headers={"authorization": "Bearer real"},
+           body={"json": {"api_key": "sk-proj-" + "A" * 24}})
+    assert main(["verify", str(p)]) == 1
+    out = capsys.readouterr().out
+    assert "FAIL" in out
+    assert "authorization" in out and "api_key" in out
+
+
+def test_cli_verify_passes_after_scrub(tmp_path):
+    p = tmp_path / "c.json"
+    _write(p, headers={"authorization": "Bearer real"},
+           body={"json": {"note": "ghp_" + "a" * 36}})
+    assert main(["scrub", str(p)]) == 0
+    assert main(["verify", str(p)]) == 0
+
+
+def test_cli_verify_malformed_errors(tmp_path, capsys):
+    p = tmp_path / "bad.json"
+    p.write_text("{ not valid json", encoding="utf-8")
+    assert main(["verify", str(p)]) == 2
+    assert "error:" in capsys.readouterr().err
