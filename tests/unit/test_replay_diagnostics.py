@@ -1,6 +1,8 @@
 """A replay miss explains *why* nothing matched."""
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from standin.cassette import Cassette
@@ -60,3 +62,38 @@ def test_url_mismatch_is_shown():
     message = str(exc.value)
     assert "url" in message
     assert "http://api/x" in message and "http://api/y" in message
+
+
+def test_method_mismatch_is_shown():
+    # Same url and body, different verb: the closest recording differs by method.
+    engine = _engine([_interaction({"a": 1})])
+    with pytest.raises(CannotReplay) as exc:
+        engine.handle(_raw(b'{"a":1}', method="PUT"), _fail)
+    message = str(exc.value)
+    assert "method" in message
+    assert "'PUT'" in message and "'POST'" in message
+
+
+def test_text_body_diff_renders_line_by_line():
+    # A non-JSON body diff: the pretty-printer can't json.loads it, so it falls
+    # back to plain lines. The live request also carries no content-type header.
+    recorded = Interaction(
+        request=RecordedRequest("POST", "http://api/x", {}, {"text": "the quick brown fox"}),
+        response=RecordedResponse(200, {}, {"json": {"ok": True}}),
+    )
+    engine = _engine([recorded])
+    live = RawRequest("POST", "http://api/x", {}, b"the quick brown dog")
+    with pytest.raises(CannotReplay) as exc:
+        engine.handle(live, _fail)
+    message = str(exc.value)
+    assert "body" in message
+    assert "fox" in message and "dog" in message
+
+
+def test_huge_body_diff_is_truncated():
+    recorded = _interaction({f"k{i}": i for i in range(60)})
+    engine = _engine([recorded])
+    live_body = json.dumps({f"k{i}": i + 1000 for i in range(60)}).encode()
+    with pytest.raises(CannotReplay) as exc:
+        engine.handle(_raw(live_body), _fail)
+    assert "(diff truncated)" in str(exc.value)
