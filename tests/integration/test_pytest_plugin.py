@@ -41,3 +41,47 @@ def test_auto_named(standin):
     )
     result = pytester.runpytest_inprocess("-p", "standin.pytest_plugin")
     result.assert_outcomes(passed=1)
+
+
+def _record_probe(llm_server):
+    # An inner test that passes only when the run *recorded* (dirty is set), so
+    # a passing outcome means "recorded" and a failing one means "replayed".
+    return f'''
+import httpx
+import pytest
+
+BODY = {{"model": "g", "messages": [{{"role": "user", "content": "hi"}}]}}
+
+@pytest.mark.standin(path="shared.json")
+def test_probe(standin):
+    httpx.post("{llm_server.url}/v1/chat", json=BODY)
+    assert standin.dirty
+'''
+
+
+def test_standin_mode_option_forces_record(pytester, llm_server):
+    pytester.makepyfile(test_inner=_record_probe(llm_server))
+    # First run: no cassette yet, default `once` records it.
+    pytester.runpytest_inprocess("-p", "standin.pytest_plugin").assert_outcomes(passed=1)
+    # Second run: cassette exists, default `once` replays -> not dirty -> fails.
+    pytester.runpytest_inprocess("-p", "standin.pytest_plugin").assert_outcomes(failed=1)
+    # --standin-mode=all re-records even though the cassette exists.
+    result = pytester.runpytest_inprocess("-p", "standin.pytest_plugin", "--standin-mode=all")
+    result.assert_outcomes(passed=1)
+
+
+def test_standin_record_flag_forces_record(pytester, llm_server):
+    pytester.makepyfile(test_inner=_record_probe(llm_server))
+    pytester.runpytest_inprocess("-p", "standin.pytest_plugin").assert_outcomes(passed=1)
+    pytester.runpytest_inprocess("-p", "standin.pytest_plugin").assert_outcomes(failed=1)
+    # --standin-record is shorthand for --standin-mode=all.
+    result = pytester.runpytest_inprocess("-p", "standin.pytest_plugin", "--standin-record")
+    result.assert_outcomes(passed=1)
+
+
+def test_standin_mode_option_beats_env(pytester, llm_server, monkeypatch):
+    # STANDIN_MODE=none would refuse to record, but an explicit --standin-mode wins.
+    monkeypatch.setenv("STANDIN_MODE", "none")
+    pytester.makepyfile(test_inner=_record_probe(llm_server))
+    result = pytester.runpytest_inprocess("-p", "standin.pytest_plugin", "--standin-mode=all")
+    result.assert_outcomes(passed=1)

@@ -15,6 +15,11 @@ All notable changes to this project are documented here. The format follows
   response changed (status and/or body), with a per-interaction summary. Exits
   `0` when the two are identical, `1` when they differ, and `2` on a load error,
   so it slots into a re-record review or CI check.
+- pytest command-line mode options. `--standin-mode=<once|none|all|new_episodes>`
+  sets the mode for cassettes opened by the `standin` fixture/marker, and
+  `--standin-record` is shorthand for `--standin-mode=all`. An explicit option
+  wins over both the marker mode and `STANDIN_MODE`; with neither flag the
+  existing env override and marker behavior are unchanged.
 
 ## [0.5.0] - 2026-09-06
 

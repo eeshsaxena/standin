@@ -81,6 +81,18 @@ with standin.use_cassette("tests/cassettes/haiku.json"):
 STANDIN_MODE=none pytest
 ```
 
+Under pytest you can also set the mode from the command line, which is handy for a
+one-off re-record without editing markers or exporting an env var:
+
+```bash
+pytest --standin-mode=none    # replay-only for this run
+pytest --standin-record       # shorthand for --standin-mode=all (re-record everything)
+```
+
+An explicit `--standin-mode`/`--standin-record` wins over both the `@pytest.mark.standin`
+mode and `STANDIN_MODE`; with neither flag, the existing marker and `STANDIN_MODE`
+behavior is unchanged.
+
 ## What a cassette looks like
 
 Plain, reviewable JSON, secrets already stripped:
