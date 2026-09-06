@@ -81,3 +81,44 @@ def test_cli_verify_malformed_errors(tmp_path, capsys):
     p.write_text("{ not valid json", encoding="utf-8")
     assert main(["verify", str(p)]) == 2
     assert "error:" in capsys.readouterr().err
+
+
+def _interaction(url="http://api/x", status=200, body=None):
+    return Interaction(
+        request=RecordedRequest("POST", url, {}, {"json": {"a": 1}}),
+        response=RecordedResponse(status, {}, body or {"json": {"ok": True}}),
+    )
+
+
+def test_cli_diff_identical_exits_zero(tmp_path, capsys):
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    JSONCassetteStore().save(a, [_interaction()])
+    JSONCassetteStore().save(b, [_interaction()])
+    assert main(["diff", str(a), str(b)]) == 0
+    out = capsys.readouterr().out
+    assert "identical" in out
+    assert "1 unchanged" in out
+
+
+def test_cli_diff_reports_changes_exits_one(tmp_path, capsys):
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    JSONCassetteStore().save(a, [_interaction(status=200)])
+    JSONCassetteStore().save(b, [
+        _interaction(status=500, body={"json": {"ok": False}}),
+        _interaction(url="http://api/y"),  # only in B
+    ])
+    assert main(["diff", str(a), str(b)]) == 1
+    out = capsys.readouterr().out
+    assert "status 200 -> 500" in out
+    assert "body changed" in out
+    assert "http://api/y" in out and "only in B" in out
+    assert "differ" in out
+
+
+def test_cli_diff_malformed_errors(tmp_path, capsys):
+    a = tmp_path / "a.json"
+    JSONCassetteStore().save(a, [_interaction()])
+    bad = tmp_path / "bad.json"
+    bad.write_text("{ not valid json", encoding="utf-8")
+    assert main(["diff", str(a), str(bad)]) == 2
+    assert "error:" in capsys.readouterr().err

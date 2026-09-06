@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-06
+
+### Added
+- `standin diff <a> <b>`: compare two cassettes interaction by interaction. It
+  matches requests the same way replay does, then reports which interactions are
+  only in the first, only in the second, and which match by request but whose
+  response changed (status and/or body), with a per-interaction summary. Exits
+  `0` when the two are identical, `1` when they differ, and `2` on a load error,
+  so it slots into a re-record review or CI check.
+
 ## [0.5.0] - 2026-09-06
 
 ### Added

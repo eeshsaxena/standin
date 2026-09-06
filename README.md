@@ -133,11 +133,12 @@ standin.use_cassette(path, matcher=MyMatcher(), redactor=MyRedactor(), store=MyS
 ## Command line
 
 ```bash
-standin list   tests/cassettes/summary.json    # one line per interaction
-standin show   tests/cassettes/summary.json 0  # full request/response
-standin stats  tests/cassettes/summary.json    # counts by method/status
-standin scrub  tests/cassettes/summary.json    # re-run secret redaction in place
-standin verify tests/cassettes/summary.json    # exit non-zero if a secret remains
+standin list   tests/cassettes/summary.json          # one line per interaction
+standin show   tests/cassettes/summary.json 0        # full request/response
+standin stats  tests/cassettes/summary.json          # counts by method/status
+standin scrub  tests/cassettes/summary.json          # re-run secret redaction in place
+standin verify tests/cassettes/summary.json          # exit non-zero if a secret remains
+standin diff   old.json tests/cassettes/summary.json # what changed between two cassettes
 ```
 
 `verify` is a **"safe to commit?" gate**: it prints a summary, then scans every
@@ -152,6 +153,16 @@ standin verify tests/cassettes/*.json
 
 The scanner and the redactor share one set of rules, so anything `scrub` masks is
 exactly what `verify` looks for.
+
+`diff` compares two cassettes interaction by interaction — handy for reviewing what
+a re-record changed. It matches requests the same way replay does, then reports which
+interactions are only in the first, only in the second, and which match by request but
+whose response changed (status and/or body). It exits `0` when the two are identical,
+`1` when they differ, and `2` on a load error:
+
+```bash
+standin diff old.json tests/cassettes/summary.json
+```
 
 ## Roadmap
 
