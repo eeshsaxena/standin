@@ -6,6 +6,10 @@ dist/
 .pytest_cache/
 .hypothesis/
 .mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 .venv/
 venv/
 .env
